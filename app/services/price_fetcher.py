@@ -25,6 +25,12 @@ class PriceFetcher:
         self.stock_api_url = settings.stock_api_base_url
         self.mf_api_url = settings.mf_api_base_url
         self.timeout = settings.api_timeout
+
+        # Disable SSL verification (corporate proxy workaround)
+        self.client_kwargs = {
+            "timeout": self.timeout,
+            "verify": False,  # ← Disables SSL verification
+        }
     
     # ----------------------------------------
     # STOCK PRICE FETCHING
@@ -53,7 +59,7 @@ class PriceFetcher:
         url = f"{self.stock_api_url}/stock?symbol={symbol}&res=num"
         
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(**self.client_kwargs) as client:
                 response = await client.get(url)
                 response.raise_for_status()
                 
@@ -139,7 +145,7 @@ class PriceFetcher:
         url = f"{self.mf_api_url}/mf/{scheme_code}/latest"
         
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(**self.client_kwargs) as client:
                 response = await client.get(url)
                 response.raise_for_status()
                 
@@ -225,7 +231,7 @@ class PriceFetcher:
         url = f"{self.mf_api_url}/mf/search?q={query}"
         
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(**self.client_kwargs) as client:
                 response = await client.get(url)
                 response.raise_for_status()
                 
