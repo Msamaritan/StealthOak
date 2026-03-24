@@ -70,11 +70,15 @@ class PortfolioStats:
         stocks = [h for h in holdings if h.asset_type == "stock"]
         mfs = [h for h in holdings if h.asset_type == "mutual_fund"]
         
+        # Prepare data for API calls
+        # Format: list of (symbol, exchange) tuples
         # Fetch prices in parallel
-        stock_symbols = [h.symbol for h in stocks]
+        stock_symbols_with_exchange = [
+            (h.symbol, h.exchange or "NSE") for h in stocks
+        ]
         mf_codes = [h.symbol for h in mfs]  # symbol stores scheme_code for MF
         
-        stock_prices = await price_fetcher.get_multiple_stock_prices(stock_symbols)
+        stock_prices = await price_fetcher.get_multiple_stock_prices(stock_symbols_with_exchange)
         mf_prices = await price_fetcher.get_multiple_mf_navs(mf_codes)
         
         # Enrich holdings
@@ -113,8 +117,8 @@ class PortfolioStats:
                 quantity=holding.quantity,
                 avg_price=holding.avg_price,
                 invested_value=invested_value,
-                current_price=current_price,
-                current_value=current_value,
+                current_price=current_price if current_price else None,
+                current_value=current_value if current_value else None,
                 pnl=pnl,
                 pnl_percent=pnl_percent,
                 day_change=day_change,
