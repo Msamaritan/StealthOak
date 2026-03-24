@@ -554,7 +554,7 @@ a:hover {
 }
 
 /* --------------------------------------------
-   SEARCH RESULTS (MF Search)
+   SEARCH RESULTS
    -------------------------------------------- */
 .search-results {
     display: none;
@@ -567,6 +567,7 @@ a:hover {
     border-radius: var(--radius-sm);
     box-shadow: var(--shadow-md);
     z-index: 100;
+    margin-top: 4px;
 }
 
 .form-group {
@@ -577,6 +578,10 @@ a:hover {
     padding: var(--spacing-sm) var(--spacing-md);
     cursor: pointer;
     border-bottom: 1px solid var(--color-border);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
 }
 
 .search-item:hover {
@@ -588,11 +593,26 @@ a:hover {
 }
 
 .search-item strong {
-    display: block;
-    font-size: 0.875rem;
+    font-size: 0.9rem;
+    color: var(--color-primary);
 }
 
 .search-item small {
+    color: var(--color-text-muted);
+}
+
+.search-item .stock-name {
+    flex: 1;
+    font-size: 0.85rem;
+    color: var(--color-text);
+}
+
+.search-item .exchange-badge {
+    background: var(--color-surface-dark);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    font-weight: 600;
     color: var(--color-text-muted);
 }
 

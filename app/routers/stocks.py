@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Holding, Portfolio
-from app.schemas import HoldingCreate, HoldingResponse
+from app.schemas import HoldingCreate
 from app.services.price_fetcher import price_fetcher
 from app.services.portfolio_stats import portfolio_stats
 
@@ -70,6 +70,27 @@ async def add_stock_page(request: Request):
 # ----------------------------------------
 # API ENDPOINTS
 # ----------------------------------------
+
+@router.get("/api/search")
+async def search_stocks(q: str = ""):
+    """
+    Search stocks by name or symbol.
+    
+    Example:
+        GET /stocks/api/search?q=infosys
+        GET /stocks/api/search?q=TCS
+    
+    Returns:
+        [
+            {"symbol": "INFY", "name": "Infosys Limited", "exchange": "NSE"},
+            {"symbol": "INFY", "name": "Infosys Limited", "exchange": "BSE"},
+        ]
+    """
+    if not q or len(q) < 2:
+        return []
+    
+    results = await price_fetcher.search_stocks(q)
+    return results
 
 @router.post("/api", status_code=status.HTTP_201_CREATED)
 async def create_stock(
