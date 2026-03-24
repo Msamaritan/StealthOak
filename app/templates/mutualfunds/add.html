@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Add Mutual Fund - StealthOak{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Add New Mutual Fund</h2>
+</div>
+
+<div class="form-container">
+    {% if errors %}
+        <div class="error-box">
+            <strong>Please fix the following:</strong>
+            <ul>
+                {% for error in errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    
+    <form method="POST" action="/mutualfunds/add" class="add-form">
+        <!-- Search Box -->
+        <div class="form-group">
+            <label for="search">Search Fund</label>
+            <input 
+                type="text" 
+                id="search" 
+                placeholder="Type to search... (e.g., Axis Bluechip)"
+                autocomplete="off"
+            >
+            <small>Search for fund name, then select from results</small>
+            <div id="searchResults" class="search-results"></div>
+        </div>
+        
+        <hr>
+        
+        <!-- Selected Fund Details -->
+        <div class="form-group">
+            <label for="scheme_code">Scheme Code *</label>
+            <input 
+                type="text" 
+                id="scheme_code" 
+                name="scheme_code" 
+                placeholder="Will be filled when you select a fund"
+                value="{{ form_data.scheme_code if form_data else '' }}"
+                readonly
+                required
+            >
+        </div>
+        
+        <div class="form-group">
+            <label for="name">Fund Name *</label>
+            <input 
+                type="text" 
+                id="name" 
+                name="name" 
+                placeholder="Will be filled when you select a fund"
+                value="{{ form_data.name if form_data else '' }}"
+                required
+            >
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="quantity">Units *</label>
+                <input 
+                    type="number" 
+                    id="quantity" 
+                    name="quantity" 
+                    placeholder="e.g., 120.5678"
+                    value="{{ form_data.quantity if form_data else '' }}"
+                    min="0.0001"
+                    step="0.0001"
+                    required
+                >
+            </div>
+            
+            <div class="form-group">
+                <label for="avg_price">Average NAV (₹) *</label>
+                <input 
+                    type="number" 
+                    id="avg_price" 
+                    name="avg_price" 
+                    placeholder="e.g., 45.2345"
+                    value="{{ form_data.avg_price if form_data else '' }}"
+                    min="0.0001"
+                    step="0.0001"
+                    required
+                >
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <a href="/mutualfunds" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">✓ Add Fund</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const searchInput = document.getElementById('search');
+    const searchResults = document.getElementById('searchResults');
+    const schemeCodeInput = document.getElementById('scheme_code');
+    const nameInput = document.getElementById('name');
+    
+    let searchTimeout = null;
+    
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        // Clear previous timeout
+        if (searchTimeout) clearTimeout(searchTimeout);
+        
+        // Hide results if query is too short
+        if (query.length < 3) {
+            searchResults.innerHTML = '';
+            searchResults.style.display = 'none';
+            return;
+        }
+        
+        // Debounce: wait 300ms after user stops typing
+        searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/mutualfunds/api/search?q=${encodeURIComponent(query)}`);
+                const funds = await response.json();
+                
+                if (funds.length === 0) {
+                    searchResults.innerHTML = '<div class="search-item no-results">No funds found</div>';
+                } else {
+                    searchResults.innerHTML = funds.map(fund => `
+                        <div class="search-item" onclick="selectFund('${fund.scheme_code}', '${fund.scheme_name.replace(/'/g, "\\'")}')">
+                            <strong>${fund.scheme_name}</strong>
+                            <small>Code: ${fund.scheme_code}</small>
+                        </div>
+                    `).join('');
+                }
+                
+                searchResults.style.display = 'block';
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }, 300);
+    });
+    
+    function selectFund(code, name) {
+        schemeCodeInput.value = code;
+        nameInput.value = name;
+        searchInput.value = name;
+        searchResults.style.display = 'none';
+    }
+    
+    // Hide results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}

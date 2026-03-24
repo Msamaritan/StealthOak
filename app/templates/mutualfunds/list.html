@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Mutual Funds - StealthOak{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>My Mutual Funds</h2>
+    <a href="/mutualfunds/add" class="btn btn-primary">+ Add Fund</a>
+</div>
+
+{% if mutual_funds %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Fund Name</th>
+                <th>Scheme Code</th>
+                <th>Units</th>
+                <th>Avg NAV</th>
+                <th>Current NAV</th>
+                <th>Invested</th>
+                <th>Current</th>
+                <th>P&L</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mf in mutual_funds %}
+            <tr>
+                <td>
+                    <strong>{{ mf.name }}</strong>
+                </td>
+                <td>{{ mf.symbol }}</td>
+                <td>{{ "{:.4f}".format(mf.quantity) }}</td>
+                <td>₹{{ "{:.4f}".format(mf.avg_price) }}</td>
+                <td>
+                    {% if mf.current_price %}
+                        ₹{{ "{:.4f}".format(mf.current_price) }}
+                    {% else %}
+                        <span class="unavailable">Unavailable</span>
+                    {% endif %}
+                </td>
+                <td>₹{{ "{:,.2f}".format(mf.invested_value) }}</td>
+                <td>
+                    {% if mf.current_value %}
+                        ₹{{ "{:,.2f}".format(mf.current_value) }}
+                    {% else %}
+                        --
+                    {% endif %}
+                </td>
+                <td class="{% if mf.pnl and mf.pnl >= 0 %}profit{% elif mf.pnl %}loss{% endif %}">
+                    {% if mf.pnl is not none %}
+                        {{ "{:+,.2f}".format(mf.pnl) }}
+                        <br>
+                        <small>({{ "{:+.2f}".format(mf.pnl_percent) }}%)</small>
+                    {% else %}
+                        --
+                    {% endif %}
+                </td>
+                <td>
+                    <button 
+                        class="btn btn-danger btn-small delete-btn" 
+                        data-id="{{ mf.id }}"
+                        data-name="{{ mf.name[:30] }}"
+                    >
+                        🗑️
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <p>You haven't added any mutual funds yet.</p>
+        <a href="/mutualfunds/add" class="btn btn-primary">Add Your First Fund</a>
+    </div>
+{% endif %}
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>⚠️ Delete Mutual Fund?</h3>
+        <p>Are you sure you want to delete <strong id="deleteMFName"></strong>?</p>
+        <p class="warning">This action cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-danger" id="confirmDeleteBtn">🗑️ Delete</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let mfToDelete = null;
+
+    // Attach click handlers to all delete buttons
+    document.querySelectorAll('.delete-btn').forEach(function(btn) {
+        btn.onclick = function() {
+            deleteMF(this.dataset.id, this.dataset.name);
+        };
+    });
+    
+    function deleteMF(id, name) {
+        mfToDelete = id;
+        document.getElementById('deleteMFName').textContent = name;
+        document.getElementById('deleteModal').style.display = 'flex';
+    }
+    
+    function closeModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+        mfToDelete = null;
+    }
+    
+    document.getElementById('confirmDeleteBtn').onclick = async function() {
+        if (!mfToDelete) return;
+        
+        try {
+            const response = await fetch(`/mutualfunds/api/${mfToDelete}`, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Failed to delete mutual fund');
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+        
+        closeModal();
+    };
+    
+    document.getElementById('deleteModal').onclick = function(e) {
+        if (e.target === this) closeModal();
+    };
+</script>
+{% endblock %}

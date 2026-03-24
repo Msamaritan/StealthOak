@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Stocks - StealthOak{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>My Stocks</h2>
+    <a href="/stocks/add" class="btn btn-primary">+ Add Stock</a>
+</div>
+
+{% if stocks %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Name</th>
+                <th>Qty</th>
+                <th>Avg Price</th>
+                <th>LTP</th>
+                <th>Invested</th>
+                <th>Current</th>
+                <th>P&L</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stock in stocks %}
+            <tr>
+                <td>
+                    <strong>{{ stock.symbol }}</strong>
+                    <br>
+                    <small class="exchange-badge">{{ stock.exchange }}</small>
+                </td>
+                <td>{{ stock.name }}</td>
+                <td>{{ stock.quantity }}</td>
+                <td>₹{{ "{:,.2f}".format(stock.avg_price) }}</td>
+                <td>
+                    {% if stock.current_price %}
+                        ₹{{ "{:,.2f}".format(stock.current_price) }}
+                    {% else %}
+                        <span class="unavailable">Unavailable</span>
+                    {% endif %}
+                </td>
+                <td>₹{{ "{:,.2f}".format(stock.invested_value) }}</td>
+                <td>
+                    {% if stock.current_value %}
+                        ₹{{ "{:,.2f}".format(stock.current_value) }}
+                    {% else %}
+                        --
+                    {% endif %}
+                </td>
+                <td class="{% if stock.pnl and stock.pnl >= 0 %}profit{% elif stock.pnl %}loss{% endif %}">
+                    {% if stock.pnl is not none %}
+                        {{ "{:+,.2f}".format(stock.pnl) }}
+                        <br>
+                        <small>({{ "{:+.2f}".format(stock.pnl_percent) }}%)</small>
+                    {% else %}
+                        --
+                    {% endif %}
+                </td>
+                <td>
+                    <button 
+                        class="btn btn-danger btn-small delete-btn" 
+                        data-id="{{ stock.id }}"
+                        data-symbol="{{ stock.symbol }}"
+                    >
+                        🗑️
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <p>You haven't added any stocks yet.</p>
+        <a href="/stocks/add" class="btn btn-primary">Add Your First Stock</a>
+    </div>
+{% endif %}
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>⚠️ Delete Stock?</h3>
+        <p>Are you sure you want to delete <strong id="deleteStockName"></strong>?</p>
+        <p class="warning">This action cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-danger" id="confirmDeleteBtn">🗑️ Delete</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let stockToDelete = null;
+    
+    // Attach click handlers to all delete buttons
+    document.querySelectorAll('.delete-btn').forEach(function(btn) {
+        btn.onclick = function() {
+            deleteStock(this.dataset.id, this.dataset.symbol);
+        };
+    });
+    
+    function deleteStock(id, symbol) {
+        stockToDelete = id;
+        document.getElementById('deleteStockName').textContent = symbol;
+        document.getElementById('deleteModal').style.display = 'flex';
+    }
+    
+    function closeModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+        stockToDelete = null;
+    }
+    
+    document.getElementById('confirmDeleteBtn').onclick = async function() {
+        if (!stockToDelete) return;
+        
+        try {
+            const response = await fetch('/stocks/api/' + stockToDelete, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Failed to delete stock');
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+        
+        closeModal();
+    };
+    
+    // Close modal on outside click
+    document.getElementById('deleteModal').onclick = function(e) {
+        if (e.target === this) closeModal();
+    };
+</script>
+{% endblock %}
+
+
+

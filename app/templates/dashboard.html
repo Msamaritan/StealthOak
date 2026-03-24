@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - StealthOak{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <h2>Dashboard</h2>
+    
+    <!-- Metric Cards Row -->
+    <div class="metrics-row">
+        <div class="metric-card">
+            <span class="metric-label">Total Invested</span>
+            <span class="metric-value">
+                {% if summary %}
+                    ₹{{ "{:,.2f}".format(summary.total_invested) }}
+                {% else %}
+                    ₹0.00
+                {% endif %}
+            </span>
+        </div>
+        
+        <div class="metric-card">
+            <span class="metric-label">Current Value</span>
+            <span class="metric-value">
+                {% if summary %}
+                    ₹{{ "{:,.2f}".format(summary.total_current_value) }}
+                {% else %}
+                    ₹0.00
+                {% endif %}
+            </span>
+        </div>
+        
+        <div class="metric-card">
+            <span class="metric-label">Total P&L</span>
+            {% if summary %}
+                <span class="metric-value {% if summary.total_pnl >= 0 %}profit{% else %}loss{% endif %}">
+                    {% if summary.total_pnl >= 0 %}+{% endif %}₹{{ "{:,.2f}".format(summary.total_pnl) }}
+                    <small>({{ "{:+.2f}".format(summary.total_pnl_percent) }}%)</small>
+                </span>
+            {% else %}
+                <span class="metric-value">₹0.00</span>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Content Row -->
+    <div class="content-row">
+        <!-- Asset Allocation + Top Holdings -->
+        <div class="content-card">
+            <h3>Asset Allocation</h3>
+            <div class="allocation-chart">
+                <div class="allocation-bar">
+                    <div 
+                        class="allocation-stock" 
+                        data-width="{{ allocation.stock }}"
+                    >
+                        {% if allocation.stock > 10 %}{{ allocation.stock }}%{% endif %}
+                    </div>
+                    <div 
+                        class="allocation-mf" 
+                        data-width="{{ allocation.mutual_fund }}"
+                    >
+                        {% if allocation.mutual_fund > 10 %}{{ allocation.mutual_fund }}%{% endif %}
+                    </div>
+                </div>
+                <div class="allocation-legend">
+                    <span class="legend-stock">📈 Stocks: {{ allocation.stock }}%</span>
+                    <span class="legend-mf">💼 MF: {{ allocation.mutual_fund }}%</span>
+                </div>
+            </div>
+            
+            <h3>Top Holdings</h3>
+            {% if top_holdings %}
+                <ul class="top-holdings-list">
+                    {% for holding in top_holdings %}
+                    <li>
+                        <span class="holding-name">{{ holding.name }}</span>
+                        <span class="holding-value">
+                            ₹{{ "{:,.2f}".format(holding.current_value or holding.invested_value) }}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="empty-message">No holdings yet</p>
+            {% endif %}
+        </div>
+        
+        <!-- Stocks Table -->
+        <div class="content-card">
+            <div class="card-header">
+                <h3>Stocks</h3>
+                <a href="/stocks/add" class="btn btn-small">+ Add</a>
+            </div>
+            {% if stocks %}
+                <table class="holdings-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Qty</th>
+                            <th>LTP</th>
+                            <th>P&L</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stock in stocks %}
+                        <tr>
+                            <td>
+                                <strong>{{ stock.symbol }}</strong>
+                                <small>{{ stock.exchange }}</small>
+                            </td>
+                            <td>{{ stock.quantity }}</td>
+                            <td>
+                                {% if stock.current_price %}
+                                    ₹{{ "{:,.2f}".format(stock.current_price) }}
+                                {% else %}
+                                    <span class="unavailable">--</span>
+                                {% endif %}
+                            </td>
+                            <td class="{% if stock.pnl and stock.pnl >= 0 %}profit{% elif stock.pnl %}loss{% endif %}">
+                                {% if stock.pnl is not none %}
+                                    {{ "{:+.2f}".format(stock.pnl_percent) }}%
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="empty-message">No stocks yet. <a href="/stocks/add">Add one</a></p>
+            {% endif %}
+        </div>
+        
+        <!-- Mutual Funds Table -->
+        <div class="content-card">
+            <div class="card-header">
+                <h3>Mutual Funds</h3>
+                <a href="/mutualfunds/add" class="btn btn-small">+ Add</a>
+            </div>
+            {% if mutual_funds %}
+                <table class="holdings-table">
+                    <thead>
+                        <tr>
+                            <th>Fund</th>
+                            <th>Units</th>
+                            <th>NAV</th>
+                            <th>P&L</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mf in mutual_funds %}
+                        <tr>
+                            <td>
+                                <strong>{{ mf.name[:25] }}{% if mf.name|length > 25 %}...{% endif %}</strong>
+                            </td>
+                            <td>{{ "{:.2f}".format(mf.quantity) }}</td>
+                            <td>
+                                {% if mf.current_price %}
+                                    ₹{{ "{:.4f}".format(mf.current_price) }}
+                                {% else %}
+                                    <span class="unavailable">--</span>
+                                {% endif %}
+                            </td>
+                            <td class="{% if mf.pnl and mf.pnl >= 0 %}profit{% elif mf.pnl %}loss{% endif %}">
+                                {% if mf.pnl is not none %}
+                                    {{ "{:+.2f}".format(mf.pnl_percent) }}%
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="empty-message">No mutual funds yet. <a href="/mutualfunds/add">Add one</a></p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Apply widths from data attributes (avoids inline style with Jinja2)
+    document.querySelectorAll('[data-width]').forEach(function(el) {
+        el.style.width = el.dataset.width + '%';
+    });
+</script>
+{% endblock %}

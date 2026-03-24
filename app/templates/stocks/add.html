@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Add Stock - StealthOak{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Add New Stock</h2>
+</div>
+
+<div class="form-container">
+    {% if errors %}
+        <div class="error-box">
+            <strong>Please fix the following:</strong>
+            <ul>
+                {% for error in errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    
+    <form method="POST" action="/stocks/add" class="add-form">
+        <div class="form-group">
+            <label for="symbol">Symbol *</label>
+            <input 
+                type="text" 
+                id="symbol" 
+                name="symbol" 
+                placeholder="e.g., INFY, TCS, HDFCBANK"
+                value="{{ form_data.symbol if form_data else '' }}"
+                required
+            >
+            <small>Stock ticker symbol as listed on NSE/BSE</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="name">Company Name *</label>
+            <input 
+                type="text" 
+                id="name" 
+                name="name" 
+                placeholder="e.g., Infosys Limited"
+                value="{{ form_data.name if form_data else '' }}"
+                required
+            >
+        </div>
+        
+        <div class="form-group">
+            <label for="exchange">Exchange *</label>
+            <div class="radio-group">
+                <label class="radio-label">
+                    <input 
+                        type="radio" 
+                        name="exchange" 
+                        value="NSE"
+                        {{ 'checked' if (form_data and form_data.exchange == 'NSE') or not form_data else '' }}
+                    >
+                    NSE
+                </label>
+                <label class="radio-label">
+                    <input 
+                        type="radio" 
+                        name="exchange" 
+                        value="BSE"
+                        {{ 'checked' if form_data and form_data.exchange == 'BSE' else '' }}
+                    >
+                    BSE
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="quantity">Quantity *</label>
+                <input 
+                    type="number" 
+                    id="quantity" 
+                    name="quantity" 
+                    placeholder="e.g., 50"
+                    value="{{ form_data.quantity if form_data else '' }}"
+                    min="0.01"
+                    step="0.01"
+                    required
+                >
+            </div>
+            
+            <div class="form-group">
+                <label for="avg_price">Average Price (₹) *</label>
+                <input 
+                    type="number" 
+                    id="avg_price" 
+                    name="avg_price" 
+                    placeholder="e.g., 1400.50"
+                    value="{{ form_data.avg_price if form_data else '' }}"
+                    min="0.01"
+                    step="0.01"
+                    required
+                >
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <a href="/stocks" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">✓ Add Stock</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
