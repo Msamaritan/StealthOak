@@ -502,7 +502,133 @@ except httpx.TimeoutException:
 
 ```
 
+### `app/routers/`
 
+#### What?
+Endpoint handlers that define URLs and request/response logic. Each router handles a specific feature area.
+
+#### Why?
+| Approach | Problem |
+|----------|---------|
+| All routes in one file | 500+ lines, hard to navigate |
+| One file per feature | Clean, organized, maintainable |
+
+#### Routers Overview
+
+| Router | Prefix | Purpose |
+|--------|--------|---------|
+| `dashboard.py` | `/` | Main dashboard, combined stats |
+| `stocks.py` | `/stocks` | Stock CRUD operations |
+| `mutualfunds.py` | `/mutualfunds` | MF CRUD + search |
+
+#### Endpoints Summary
+
+**Dashboard**
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Dashboard HTML page |
+| GET | `/api/dashboard/stats` | Stats as JSON |
+
+**Stocks**
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/stocks` | Stocks list page |
+| GET | `/stocks/add` | Add stock form |
+| POST | `/stocks/add` | Handle form submission |
+| POST | `/stocks/api` | Create stock (JSON) |
+| DELETE | `/stocks/api/{id}` | Delete stock |
+| GET | `/stocks/api/{id}/price` | Get live price |
+
+**Mutual Funds**
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/mutualfunds` | MF list page |
+| GET | `/mutualfunds/add` | Add MF form |
+| POST | `/mutualfunds/add` | Handle form submission |
+| GET | `/mutualfunds/api/search?q=` | Search MFs |
+| POST | `/mutualfunds/api` | Create MF (JSON) |
+| DELETE | `/mutualfunds/api/{id}` | Delete MF |
+| GET | `/mutualfunds/api/{id}/nav` | Get live NAV |
+
+#### Key Concepts
+
+**Router Prefix**
+```python
+router = APIRouter(prefix="/stocks")
+# All routes start with /stocks
+```
+
+**Dependency Injection**
+```python
+async def endpoint(db: AsyncSession = Depends(get_db)):
+    # db is auto-provided, auto-committed, auto-closed
+```
+
+### `app/templates/`
+
+#### What?
+Jinja2 HTML templates that render the user interface. Data from Python is injected into HTML placeholders.
+
+#### Why Jinja2?
+| Feature | Syntax | Example |
+|---------|--------|---------|
+| Variables | `{{ var }}` | `{{ stock.name }}` |
+| Loops | `{% for %}` | `{% for stock in stocks %}` |
+| Conditionals | `{% if %}` | `{% if pnl > 0 %}` |
+| Inheritance | `{% extends %}` | `{% extends "base.html" %}` |
+| Blocks | `{% block %}` | `{% block content %}` |
+| Filters | `{{ var \| filter }}` | `{{ name \| upper }}` |
+
+#### Template Hierarchy
+base.html (parent) 
+├── dashboard.html 
+├── stocks/ │ 
+  ├── list.html 
+│ └── add.html 
+└── mutualfunds/ 
+  ├── list.html 
+  └── add.html
+
+### `app/static/css/style.css`
+
+#### What?
+Main stylesheet controlling all visual aspects — colors, spacing, layout, typography.
+
+#### Why CSS Variables?
+```css
+:root {
+    --color-primary: #2d6a4f;
+}
+```
+
+Change once → updates everywhere. Easy theming.
+**Color Scheme**
+| Variable | Color | Usage |
+|--------|------|-------------|
+|--color-primary |	#2d6a4f (Forest Green) |	Buttons, links, sidebar
+|--color-profit |	#198754 (Green) |	Positive P&L
+|--color-loss |	#dc3545 (Red)	| Negative P&L
+|--color-background |#f8f9fa (Light Gray) |	Page background
+|--color-surface |	#ffffff (White) |	Cards, forms
+
+**Key Classes**
+| Class | Purpose |
+|--------|--------|
+|.app-container | Flex container for sidebar + main
+|.sidebar | Fixed left navigation
+|.main-content | Scrollable content area
+|.metrics-row |	3-column grid for metric cards
+|.content-row |	3-column grid for content cards
+|.profit / .loss |	Green/red text colors
+|.btn-* | Button variants
+|.modal	| Delete confirmation popup
+
+**Responsive Breakpoints**
+| Width | Layout Change |
+|--------|--------|
+|> 1024px | 3 columns
+|768-1024px | 2 columns, stacked content
+|< 768px | Single column, top navigation
 
 ## API Reference
 
