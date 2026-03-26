@@ -66,6 +66,87 @@ async def add_stock_page(request: Request):
         {"request": request}
     )
 
+@router.get("/edit/{holding_id}", response_class=HTMLResponse)
+async def edit_stock_page(
+    request: Request,
+    holding_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Edit stock form page."""
+    result = await db.execute(
+        select(Holding).where(
+            Holding.id == holding_id,
+            Holding.asset_type == "stock"
+        )
+    )
+    holding = result.scalar_one_or_none()
+    
+    if not holding:
+        raise HTTPException(status_code=404, detail="Stock not found")
+    
+    return templates.TemplateResponse(
+        "stocks/edit.html",
+        {
+            "request": request,
+            "holding": holding,
+        }
+    )
+
+@router.post("/edit/{holding_id}", response_class=HTMLResponse)
+async def update_stock_form(
+    request: Request,
+    holding_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle stock edit form submission."""
+    result = await db.execute(
+        select(Holding).where(
+            Holding.id == holding_id,
+            Holding.asset_type == "stock"
+        )
+    )
+    holding = result.scalar_one_or_none()
+    
+    if not holding:
+        raise HTTPException(status_code=404, detail="Stock not found")
+    
+    form = await request.form()
+    
+    quantity = form.get("quantity", "")
+    avg_price = form.get("avg_price", "")
+    
+    errors = []
+    
+    try:
+        quantity = float(quantity)
+        if quantity <= 0:
+            errors.append("Quantity must be greater than 0")
+    except ValueError:
+        errors.append("Invalid quantity")
+    
+    try:
+        avg_price = float(avg_price)
+        if avg_price <= 0:
+            errors.append("Average price must be greater than 0")
+    except ValueError:
+        errors.append("Invalid average price")
+    
+    if errors:
+        return templates.TemplateResponse(
+            "stocks/edit.html",
+            {
+                "request": request,
+                "holding": holding,
+                "errors": errors,
+            }
+        )
+    
+    # Update holding
+    holding.quantity = quantity
+    holding.avg_price = avg_price
+    
+    return RedirectResponse(url="/stocks", status_code=303)
+
 
 # ----------------------------------------
 # API ENDPOINTS
