@@ -23,3 +23,5 @@ pydantic-settings==2.5.0  # Config management
 
 # --- Utilities ---
 python-dateutil==2.9.0    # Date handling helpers
+
+kiteconnect==5.0.0          # Zerodha Kite Connect API client

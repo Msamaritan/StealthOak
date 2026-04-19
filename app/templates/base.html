@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}StealthOak{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>🌳 StealthOak</h1>
+                <p class="tagline">Grow silently</p>
+            </div>
+            
+            <ul class="nav-links">
+                <li>
+                    <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">
+                        📊 Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="/stocks" class="{% if '/stocks' in request.url.path %}active{% endif %}">
+                        📈 Stocks
+                    </a>
+                </li>
+                <li>
+                    <a href="/mutualfunds" class="{% if '/mutualfunds' in request.url.path %}active{% endif %}">
+                        💼 Mutual Funds
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="sidebar-footer">
+                <p>Phase 0 - MVP</p>
+            </div>
+        </nav>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

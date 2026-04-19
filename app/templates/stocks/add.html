@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Add Stock - StealthOak{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Add New Stock</h2>
+</div>
+
+<div class="form-container">
+    {% if errors %}
+        <div class="error-box">
+            <strong>Please fix the following:</strong>
+            <ul>
+                {% for error in errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    
+    <form method="POST" action="/stocks/add" class="add-form">
+        <!-- Search Box -->
+        <div class="form-group">
+            <label for="search">Search Stock</label>
+            <input 
+                type="text" 
+                id="search" 
+                placeholder="Type company name or symbol... (e.g., Infosys or INFY)"
+                autocomplete="off"
+            >
+            <small>Search by company name or stock symbol, then select from results</small>
+            <div id="searchResults" class="search-results"></div>
+        </div>
+        
+        <hr>
+        
+        <!-- Selected Stock Details (Auto-filled) -->
+        <div class="form-row">
+            <div class="form-group">
+                <label for="symbol">Symbol *</label>
+                <input 
+                    type="text" 
+                    id="symbol" 
+                    name="symbol" 
+                    placeholder="e.g., INFY"
+                    value="{{ form_data.symbol if form_data else '' }}"
+                    readonly
+                    required
+                >
+                <small>Auto-filled from search</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="exchange">Exchange *</label>
+                <input 
+                    type="text" 
+                    id="exchange" 
+                    name="exchange" 
+                    placeholder="e.g., NSE"
+                    value="{{ form_data.exchange if form_data else '' }}"
+                    readonly
+                    required
+                >
+                <small>Auto-filled from search</small>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="name">Company Name *</label>
+            <input 
+                type="text" 
+                id="name" 
+                name="name" 
+                placeholder="e.g., Infosys Limited"
+                value="{{ form_data.name if form_data else '' }}"
+                readonly
+                required
+            >
+            <small>Auto-filled from search</small>
+        </div>
+        
+        <hr>
+        
+        <!-- User Input Fields -->
+        <div class="form-row">
+            <div class="form-group">
+                <label for="quantity">Quantity *</label>
+                <input 
+                    type="number" 
+                    id="quantity" 
+                    name="quantity" 
+                    placeholder="e.g., 50"
+                    value="{{ form_data.quantity if form_data else '' }}"
+                    min="0.01"
+                    step="0.01"
+                    required
+                >
+                <small>Number of shares you own</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="avg_price">Average Price (₹) *</label>
+                <input 
+                    type="number" 
+                    id="avg_price" 
+                    name="avg_price" 
+                    placeholder="e.g., 1400.50"
+                    value="{{ form_data.avg_price if form_data else '' }}"
+                    min="0.01"
+                    step="0.01"
+                    required
+                >
+                <small>Your average buy price per share</small>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <a href="/stocks" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>✓ Add Stock</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // DOM Elements
+    const searchInput = document.getElementById('search');
+    const searchResults = document.getElementById('searchResults');
+    const symbolInput = document.getElementById('symbol');
+    const nameInput = document.getElementById('name');
+    const exchangeInput = document.getElementById('exchange');
+    const quantityInput = document.getElementById('quantity');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    let searchTimeout = null;
+    
+    // Search as user types
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        // Clear previous timeout
+        if (searchTimeout) clearTimeout(searchTimeout);
+        
+        // Hide results if query is too short
+        if (query.length < 2) {
+            searchResults.innerHTML = '';
+            searchResults.style.display = 'none';
+            return;
+        }
+        
+        // Show loading
+        searchResults.innerHTML = '<div class="search-item no-results">🔍 Searching...</div>';
+        searchResults.style.display = 'block';
+        
+        // Debounce: wait 400ms after user stops typing
+        searchTimeout = setTimeout(async function() {
+            try {
+                const response = await fetch('/stocks/api/search?q=' + encodeURIComponent(query));
+                const stocks = await response.json();
+                
+                if (stocks.length === 0) {
+                    searchResults.innerHTML = '<div class="search-item no-results">No stocks found for "' + query + '"</div>';
+                } else {
+                    let html = '';
+                    for (let i = 0; i < stocks.length; i++) {
+                        const stock = stocks[i];
+                        // Escape quotes in name
+                        const safeName = stock.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                        html += '<div class="search-item" data-symbol="' + stock.symbol + '" data-name="' + safeName + '" data-exchange="' + stock.exchange + '">';
+                        html += '<strong>' + stock.symbol + '</strong>';
+                        html += '<span class="stock-name">' + stock.name + '</span>';
+                        html += '<span class="exchange-badge">' + stock.exchange + '</span>';
+                        html += '</div>';
+                    }
+                    searchResults.innerHTML = html;
+                    
+                    // Add click handlers to results
+                    const items = searchResults.querySelectorAll('.search-item');
+                    items.forEach(function(item) {
+                        item.addEventListener('click', function() {
+                            selectStock(
+                                this.dataset.symbol,
+                                this.dataset.name,
+                                this.dataset.exchange
+                            );
+                        });
+                    });
+                }
+                
+                searchResults.style.display = 'block';
+            } catch (error) {
+                console.error('Search error:', error);
+                searchResults.innerHTML = '<div class="search-item no-results">Error searching. Please try again.</div>';
+            }
+        }, 400);
+    });
+    
+    // Select a stock from search results
+    function selectStock(symbol, name, exchange) {
+        symbolInput.value = symbol;
+        nameInput.value = name;
+        exchangeInput.value = exchange;
+        searchInput.value = symbol + ' - ' + name + ' (' + exchange + ')';
+        searchResults.style.display = 'none';
+        
+        // Enable submit button
+        submitBtn.disabled = false;
+        
+        // Focus on quantity field
+        quantityInput.focus();
+    }
+    
+    // Hide results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+    
+    // Re-show results when focusing on search input
+    searchInput.addEventListener('focus', function() {
+        if (searchResults.innerHTML && searchResults.innerHTML.trim() !== '') {
+            searchResults.style.display = 'block';
+        }
+    });
+    
+    // Enable submit if all fields have values (for form re-submission with errors)
+    function checkFormValid() {
+        if (symbolInput.value && nameInput.value && exchangeInput.value) {
+            submitBtn.disabled = false;
+        }
+    }
+    checkFormValid();
+</script>
+{% endblock %}
