@@ -47,6 +47,7 @@ class Holding(Base):
         comment="Which portfolio this belongs to"
     )
     
+    # Core Attributes
     symbol: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -71,6 +72,7 @@ class Holding(Base):
         comment="'NSE' or 'BSE' for stocks, NULL for mutual funds"
     )
     
+    # Quantity and Price Attributes
     quantity: Mapped[float] = mapped_column(
         Float,
         nullable=False,
@@ -83,6 +85,32 @@ class Holding(Base):
         comment="Average buy price (stock) or NAV (MF)"
     )
     
+    # KiteConnect specific attributes
+    isin: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        index=True,
+        comment="ISIN code for stocks (e.g. 'INE009A01021'), NULL for mutual funds"
+    )
+
+    instrument_token: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Kite Connect instrument token for stocks, NULL for mutual funds"
+    )
+
+    source: Mapped[Optional[str]] = mapped_column(
+        String(30), default="manual",
+        comment="How this holding was added: 'manual', 'kite_holding', 'kite_tradebook', etc."
+    )
+
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        comment="When was this holding last updated from Kite Connect data"
+    )
+
+    # Timestamps Attributes
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,

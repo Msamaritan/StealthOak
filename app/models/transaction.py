@@ -5,7 +5,7 @@
 from datetime import date as date_type, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import String, Float, Integer, Date, DateTime, ForeignKey
+from sqlalchemy import String, Float, Integer, Date, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -46,7 +46,8 @@ class Transaction(Base):
         nullable=False,
         comment="Which holding this transaction belongs to"
     )
-    
+
+    # Core Attributes
     type: Mapped[str] = mapped_column(
         String(10),
         nullable=False,
@@ -77,6 +78,40 @@ class Transaction(Base):
         comment="Optional notes about the transaction"
     )
     
+    trade_id: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        unique=True,
+        nullable=True,
+        index=True,
+        comment="Broker's trade ID for reference"
+    )
+
+    order_id: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        index=True,
+        comment="Broker's order ID for reference"
+    )
+
+    order_execution_time: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        comment="Exact time when the order was executed"
+    )
+
+    source: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="Source of transaction data (e.g., 'manual', 'Zerodha', 'initial_CSV_import')"
+    )
+
+    is_cancelled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        comment="Whether this transaction was cancelled"
+    )
+
+    # Timestamp Attributes
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,

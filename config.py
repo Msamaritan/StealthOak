@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # Max seconds to wait for external API response
     api_timeout: int = 10
     
+    kite_api_key: str = ""
+    kite_api_secret: str = ""
+    kite_disable_ssl: bool = False
+
     model_config = SettingsConfigDict(
         env_prefix="STEALTHOAK_",  # Env vars: STEALTHOAK_DEBUG, etc.
         env_file=".env",           # Load from .env file if exists
