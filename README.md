@@ -93,6 +93,11 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Optional: Zerodha API credentials in a .env file
+# STEALTHOAK_KITE_API_KEY=your_api_key
+# STEALTHOAK_KITE_API_SECRET=your_api_secret
+# STEALTHOAK_KITE_DISABLE_SSL=true
 ```
 
 ### Running the App
