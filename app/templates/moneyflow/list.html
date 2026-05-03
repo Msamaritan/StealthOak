@@ -1,0 +1,1548 @@
+{% extends "base.html" %}
+
+{% block title %}Money Flow - StealthOak{% endblock %}
+
+{% block content %}
+<div class="moneyflow-container">
+    <!-- Header -->
+    <div class="moneyflow-header">
+        <h1>💸 Money Flow</h1>
+        <div class="moneyflow-filters">
+            <select id="monthFilter" class="filter-select" onchange="filterByMonth(this.value)">
+                <option value="">All Time</option>
+                {% for month in available_months %}
+                <option value="{{ month }}" {% if selected_month == month %}selected{% endif %}>
+                    {{ month }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Three Column Layout -->
+    <div class="moneyflow-board">
+        
+        <!-- Column 1: Bank Transfers -->
+        <div class="moneyflow-column" data-type="bank">
+            <div class="column-header">
+                <div class="column-title">
+                    <span class="column-icon">🏦</span>
+                    <span>Bank Transfers</span>
+                </div>
+                <button class="btn-add" onclick="openBankModal()">+ Add</button>
+            </div>
+            <div class="column-cards" id="bankCards">
+                {% if bank_transfers %}
+                    {% for bt in bank_transfers %}
+                    <div class="flow-card {% if bt.idle_amount > 0 %}status-partial{% else %}status-complete{% endif %}" 
+                         data-id="{{ bt.id }}" 
+                         data-type="bank"
+                         data-amount="{{ bt.amount }}"
+                         data-allocated="{{ bt.allocated_amount }}"
+                         data-idle="{{ bt.idle_amount }}">
+                        <div class="card-date">{{ bt.date.strftime('%d %b %Y') }}</div>
+                        <div class="card-details">
+                            <span class="card-source">{{ bt.source_bank }}</span>
+                            <span class="card-amount">₹{{ "{:,.0f}".format(bt.amount) }}</span>
+                        </div>
+                        {% if bt.idle_amount > 0 %}
+                        <div class="card-status status-idle">
+                            <span class="idle-amount">₹{{ "{:,.0f}".format(bt.idle_amount) }} idle</span>
+                        </div>
+                        {% else %}
+                        <div class="card-status status-done">
+                            <span>✓ Fully allocated</span>
+                        </div>
+                        {% endif %}
+                        {% if bt.notes %}
+                        <div class="card-notes">{{ bt.notes }}</div>
+                        {% endif %}
+                        <div class="card-actions">
+                            {% if bt.idle_amount > 0 %}
+                            <button
+                                class="btn-action btn-primary"
+                                data-bank-id="{{ bt.id }}"
+                                data-bank-name="{{ bt.source_bank }}"
+                                data-bank-date="{{ bt.date.strftime('%d %b %Y') }}"
+                                data-idle-amount="{{ bt.idle_amount }}"
+                                onclick="openAllocateModalFromButton(this)">Allocate</button>
+                            {% endif %}
+                            <button class="btn-action btn-secondary" onclick="openEditBankModal('{{ bt.id }}')">Edit</button>
+                            <button class="btn-action btn-danger" onclick="deleteEntry('bank-transfers', '{{ bt.id }}')">×</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <p>No bank transfers yet</p>
+                        <button class="btn-add-empty" onclick="openBankModal()">+ Add First Transfer</button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Column 2: Broker Credits -->
+        <div class="moneyflow-column" data-type="broker">
+            <div class="column-header">
+                <div class="column-title">
+                    <span class="column-icon">💳</span>
+                    <span>Broker Credits</span>
+                </div>
+                <button class="btn-add" onclick="openBrokerModal()">+ Add</button>
+            </div>
+            <div class="column-cards" id="brokerCards">
+                {% if broker_credits %}
+                    {% for bc in broker_credits %}
+                    <div class="flow-card {% if bc.is_complete %}status-complete{% elif bc.idle_amount > 0 %}status-partial{% else %}status-complete{% endif %}" 
+                         data-id="{{ bc.id }}" 
+                         data-type="broker"
+                         data-parent-id="{{ bc.bank_transfer_id }}"
+                         data-amount="{{ bc.amount }}"
+                         data-invested="{{ bc.invested_amount }}"
+                         data-idle="{{ bc.idle_amount }}"
+                         data-destination-type="{{ bc.destination_type }}">
+                        <div class="card-date">{{ bc.date.strftime('%d %b %Y') }}</div>
+                        <div class="card-details">
+                            <span class="card-source">→ {{ bc.destination }}</span>
+                            <span class="card-amount">₹{{ "{:,.0f}".format(bc.amount) }}</span>
+                        </div>
+                        {% if bc.destination_type == 'savings' %}
+                        <div class="card-status status-done">
+                            <span>✓ Complete</span>
+                        </div>
+                        {% elif bc.idle_amount > 0 %}
+                        <div class="card-status status-idle">
+                            <span class="idle-amount">₹{{ "{:,.0f}".format(bc.idle_amount) }} idle</span>
+                        </div>
+                        {% else %}
+                        <div class="card-status status-done">
+                            <span>✓ Fully invested</span>
+                        </div>
+                        {% endif %}
+                        {% if bc.notes %}
+                        <div class="card-notes">{{ bc.notes }}</div>
+                        {% endif %}
+                        <div class="card-actions">
+                            {% if bc.destination_type == 'broker' and bc.idle_amount > 0 %}
+                            <button
+                                class="btn-action btn-primary"
+                                data-broker-id="{{ bc.id }}"
+                                data-broker-name="{{ bc.destination }}"
+                                data-broker-date="{{ bc.date.strftime('%d %b %Y') }}"
+                                data-idle-amount="{{ bc.idle_amount }}"
+                                onclick="openInvestModalFromButton(this)">Invest</button>
+                            {% endif %}
+                            <button class="btn-action btn-secondary" onclick="openEditBrokerModal('{{ bc.id }}')">Edit</button>
+                            <button class="btn-action btn-danger" onclick="deleteEntry('broker-credits', '{{ bc.id }}')">×</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <p>No broker credits yet</p>
+                        <small>Allocate from bank transfers first</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Column 3: Investments -->
+        <div class="moneyflow-column" data-type="investment">
+            <div class="column-header">
+                <div class="column-title">
+                    <span class="column-icon">📈</span>
+                    <span>Investments</span>
+                </div>
+                <button class="btn-add" onclick="openInvestmentModal()">+ Add</button>
+            </div>
+            <div class="column-cards" id="investmentCards">
+                {% if investments %}
+                    {% for inv in investments %}
+                    <div class="flow-card status-complete" 
+                         data-id="{{ inv.id }}" 
+                         data-type="investment"
+                         data-parent-id="{{ inv.broker_credit_id }}"
+                         data-amount="{{ inv.amount }}">
+                        <div class="card-date">{{ inv.date.strftime('%d %b %Y') }}</div>
+                        <div class="card-details">
+                            <span class="card-source">{{ inv.holding_name }}</span>
+                            <span class="card-amount">₹{{ "{:,.0f}".format(inv.amount) }}</span>
+                        </div>
+                        {% if inv.notes %}
+                        <div class="card-notes">{{ inv.notes }}</div>
+                        {% endif %}
+                        <div class="card-actions">
+                            <button class="btn-action btn-secondary" onclick="openEditInvestmentModal('{{ inv.id }}')">Edit</button>
+                            <button class="btn-action btn-danger" onclick="deleteEntry('investments', '{{ inv.id }}')">×</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <p>No investments yet</p>
+                        <small>Invest from broker credits first</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Summary Bar -->
+    <div class="moneyflow-summary">
+        <div class="summary-flow">
+            <div class="summary-item">
+                <span class="summary-label">🏦 Bank</span>
+                <span class="summary-value">₹{{ "{:,.0f}".format(summary.total_bank_transfers) }}</span>
+            </div>
+            <span class="summary-arrow">→</span>
+            <div class="summary-item">
+                <span class="summary-label">💳 Broker</span>
+                <span class="summary-value">₹{{ "{:,.0f}".format(summary.total_broker_credits) }}</span>
+            </div>
+            <span class="summary-arrow">→</span>
+            <div class="summary-item">
+                <span class="summary-label">📈 Invested</span>
+                <span class="summary-value">₹{{ "{:,.0f}".format(summary.total_invested) }}</span>
+            </div>
+        </div>
+        <div class="summary-idle">
+            <span class="idle-label">Idle at Bank:</span>
+            <span class="idle-value">₹{{ "{:,.0f}".format(summary.idle_at_bank) }}</span>
+            <span class="idle-separator">|</span>
+            <span class="idle-label">Idle at Broker:</span>
+            <span class="idle-value">₹{{ "{:,.0f}".format(summary.idle_at_broker) }}</span>
+        </div>
+    </div>
+
+    <!-- Idle Breakdown (Expandable) -->
+    {% if summary.bank_idle_breakdown or summary.broker_idle_breakdown %}
+    <div class="idle-breakdown-section">
+        <button class="breakdown-toggle" onclick="toggleBreakdown()">
+            📊 View Idle Breakdown <span id="breakdownArrow">▼</span>
+        </button>
+        <div id="breakdownContent" class="breakdown-content" style="display: none;">
+            {% if summary.bank_idle_breakdown %}
+            <div class="breakdown-group">
+                <h4>🏦 Idle at Bank Level</h4>
+                <div class="breakdown-list">
+                    {% for item in summary.bank_idle_breakdown %}
+                    <div class="breakdown-item">
+                        <span class="breakdown-source">{{ item.source }} - {{ item.date.strftime('%d %b %Y') }}</span>
+                        <span class="breakdown-amounts">
+                            <span class="total">₹{{ "{:,.0f}".format(item.total_amount) }}</span>
+                            <span class="idle">₹{{ "{:,.0f}".format(item.idle_amount) }} idle</span>
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% if summary.broker_idle_breakdown %}
+            <div class="breakdown-group">
+                <h4>💳 Idle at Broker Level</h4>
+                <div class="breakdown-list">
+                    {% for item in summary.broker_idle_breakdown %}
+                    <div class="breakdown-item">
+                        <span class="breakdown-source">{{ item.source }} - {{ item.date.strftime('%d %b %Y') }}</span>
+                        <span class="breakdown-amounts">
+                            <span class="total">₹{{ "{:,.0f}".format(item.total_amount) }}</span>
+                            <span class="idle">₹{{ "{:,.0f}".format(item.idle_amount) }} idle</span>
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- Modal: Add Bank Transfer -->
+<div id="bankModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="bankModalTitle">🏦 New Bank Transfer</h2>
+            <button class="modal-close" onclick="closeModal('bank')">&times;</button>
+        </div>
+        <form id="bankForm" onsubmit="saveBank(event)">
+            <input type="hidden" id="bankEditId" value="">
+            <div class="form-group">
+                <label for="bankDate">Date</label>
+                <input type="date" id="bankDate" required>
+            </div>
+            <div class="form-group">
+                <label for="bankSource">Bank</label>
+                <select id="bankSource" required>
+                    <option value="">Select Bank</option>
+                    {% for bank in banks %}
+                    <option value="{{ bank }}">{{ bank }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="bankAmount">Amount (₹)</label>
+                <input type="number" id="bankAmount" placeholder="50000" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="bankNotes">Notes (optional)</label>
+                <input type="text" id="bankNotes" placeholder="May investment quota" maxlength="255">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeModal('bank')">Cancel</button>
+                <button type="submit" class="btn-save">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Add Broker Credit (Allocate) -->
+<div id="allocateModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>📤 Allocate to Broker</h2>
+            <button class="modal-close" onclick="closeModal('allocate')">&times;</button>
+        </div>
+        <div class="modal-source-info">
+            <span>From: <strong id="allocateSource">-</strong></span>
+            <span>Available: <strong id="allocateAvailable">₹0</strong></span>
+        </div>
+        <form id="allocateForm" onsubmit="saveAllocate(event)">
+            <input type="hidden" id="allocateBankId" value="">
+            <input type="hidden" id="allocateMaxAmount" value="0">
+            <div class="form-group">
+                <label for="allocateDate">Date</label>
+                <input type="date" id="allocateDate" required>
+            </div>
+            <div class="form-group">
+                <label for="allocateDestination">Destination</label>
+                <select id="allocateDestination" required onchange="updateDestinationType()">
+                    <option value="">Select Destination</option>
+                    <optgroup label="Brokers">
+                        {% for broker in brokers %}
+                        <option value="{{ broker }}" data-type="broker">{{ broker }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    <optgroup label="Savings">
+                        {% for saving in savings %}
+                        <option value="{{ saving }}" data-type="savings">{{ saving }}</option>
+                        {% endfor %}
+                    </optgroup>
+                </select>
+            </div>
+            <input type="hidden" id="allocateDestinationType" value="broker">
+            <div class="form-group">
+                <label for="allocateAmount">Amount (₹)</label>
+                <input type="number" id="allocateAmount" placeholder="40000" min="1" required oninput="updateAllocateRemaining()">
+            </div>
+            <div class="form-remaining">
+                Remaining after allocation: <strong id="allocateRemaining">₹0</strong>
+            </div>
+            <div class="form-group">
+                <label for="allocateNotes">Notes (optional)</label>
+                <input type="text" id="allocateNotes" placeholder="Monthly SIP allocation" maxlength="255">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeModal('allocate')">Cancel</button>
+                <button type="submit" class="btn-save">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Add Broker Credit (Direct) -->
+<div id="brokerModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="brokerModalTitle">💳 New Broker Credit</h2>
+            <button class="modal-close" onclick="closeModal('broker')">&times;</button>
+        </div>
+        <form id="brokerForm" onsubmit="saveBrokerDirect(event)">
+            <input type="hidden" id="brokerEditId" value="">
+            <div class="form-group">
+                <label for="brokerBankTransfer">From Bank Transfer</label>
+                <select id="brokerBankTransfer" required>
+                    <option value="">Select Bank Transfer</option>
+                    {% for bt in bank_transfers %}
+                        {% if bt.idle_amount > 0 %}
+                        <option value="{{ bt.id }}" data-idle="{{ bt.idle_amount }}">
+                            {{ bt.source_bank }} - {{ bt.date.strftime('%d %b %Y') }} (₹{{ "{:,.0f}".format(bt.idle_amount) }} available)
+                        </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="brokerDate">Date</label>
+                <input type="date" id="brokerDate" required>
+            </div>
+            <div class="form-group">
+                <label for="brokerDestination">Destination</label>
+                <select id="brokerDestination" required onchange="updateBrokerDestinationType()">
+                    <option value="">Select Destination</option>
+                    <optgroup label="Brokers">
+                        {% for broker in brokers %}
+                        <option value="{{ broker }}" data-type="broker">{{ broker }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    <optgroup label="Savings">
+                        {% for saving in savings %}
+                        <option value="{{ saving }}" data-type="savings">{{ saving }}</option>
+                        {% endfor %}
+                    </optgroup>
+                </select>
+            </div>
+            <input type="hidden" id="brokerDestinationType" value="broker">
+            <div class="form-group">
+                <label for="brokerAmount">Amount (₹)</label>
+                <input type="number" id="brokerAmount" placeholder="40000" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="brokerNotes">Notes (optional)</label>
+                <input type="text" id="brokerNotes" placeholder="" maxlength="255">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeModal('broker')">Cancel</button>
+                <button type="submit" class="btn-save">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Add Investment -->
+<div id="investModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>📈 Record Investment</h2>
+            <button class="modal-close" onclick="closeModal('invest')">&times;</button>
+        </div>
+        <div class="modal-source-info">
+            <span>From: <strong id="investSource">-</strong></span>
+            <span>Available: <strong id="investAvailable">₹0</strong></span>
+        </div>
+        <form id="investForm" onsubmit="saveInvest(event)">
+            <input type="hidden" id="investBrokerId" value="">
+            <input type="hidden" id="investMaxAmount" value="0">
+            <div class="form-group">
+                <label for="investDate">Date</label>
+                <input type="date" id="investDate" required>
+            </div>
+            <div class="form-group">
+                <label for="investHolding">Stock / Mutual Fund</label>
+                <input type="text" id="investHolding" placeholder="e.g., HDFC Flexi Cap, GOLDBEES" required maxlength="100">
+            </div>
+            <div class="form-group">
+                <label for="investAmount">Amount (₹)</label>
+                <input type="number" id="investAmount" placeholder="15000" min="1" required oninput="updateInvestRemaining()">
+            </div>
+            <div class="form-remaining">
+                Remaining after investment: <strong id="investRemaining">₹0</strong>
+            </div>
+            <div class="form-group">
+                <label for="investNotes">Notes (optional)</label>
+                <input type="text" id="investNotes" placeholder="" maxlength="255">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeModal('invest')">Cancel</button>
+                <button type="submit" class="btn-save">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Add Investment (Direct) -->
+<div id="investmentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="investmentModalTitle">📈 New Investment</h2>
+            <button class="modal-close" onclick="closeModal('investment')">&times;</button>
+        </div>
+        <form id="investmentForm" onsubmit="saveInvestmentDirect(event)">
+            <input type="hidden" id="investmentEditId" value="">
+            <div class="form-group">
+                <label for="investmentBrokerCredit">From Broker Credit</label>
+                <select id="investmentBrokerCredit" required>
+                    <option value="">Select Broker Credit</option>
+                    {% for bc in broker_credits %}
+                        {% if bc.destination_type == 'broker' and bc.idle_amount > 0 %}
+                        <option value="{{ bc.id }}" data-idle="{{ bc.idle_amount }}">
+                            {{ bc.destination }} - {{ bc.date.strftime('%d %b %Y') }} (₹{{ "{:,.0f}".format(bc.idle_amount) }} available)
+                        </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="investmentDate">Date</label>
+                <input type="date" id="investmentDate" required>
+            </div>
+            <div class="form-group">
+                <label for="investmentHolding">Stock / Mutual Fund</label>
+                <input type="text" id="investmentHolding" placeholder="e.g., HDFC Flexi Cap, GOLDBEES" required maxlength="100">
+            </div>
+            <div class="form-group">
+                <label for="investmentAmount">Amount (₹)</label>
+                <input type="number" id="investmentAmount" placeholder="15000" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="investmentNotes">Notes (optional)</label>
+                <input type="text" id="investmentNotes" placeholder="" maxlength="255">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeModal('investment')">Cancel</button>
+                <button type="submit" class="btn-save">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_head %}
+<style>
+/* Money Flow Container */
+.moneyflow-container {
+    padding: 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.moneyflow-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.moneyflow-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--color-text);
+}
+
+.filter-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-surface);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+/* Three Column Board */
+.moneyflow-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Individual Column */
+.moneyflow-column {
+    background: var(--color-background);
+    border-radius: 12px;
+    padding: 1rem;
+    min-height: 400px;
+    max-height: 600px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+}
+
+.column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    background: var(--color-background);
+    z-index: 1;
+}
+
+.column-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.column-icon {
+    font-size: 1.2rem;
+}
+
+.btn-add {
+    padding: 0.4rem 0.8rem;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.btn-add:hover {
+    background: var(--color-primary-dark);
+}
+
+/* Cards Container */
+.column-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--color-text-muted);
+}
+
+.empty-state p {
+    margin: 0 0 0.5rem 0;
+}
+
+.empty-state small {
+    font-size: 0.8rem;
+}
+
+.btn-add-empty {
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+/* Flow Card */
+.flow-card {
+    background: var(--color-surface);
+    border-radius: 8px;
+    padding: 1rem;
+    border-left: 4px solid var(--color-border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.flow-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+}
+
+/* Card Status Borders */
+.flow-card.status-partial {
+    border-left-color: #f0ad4e;
+}
+
+.flow-card.status-complete {
+    border-left-color: var(--color-profit);
+}
+
+.flow-card.status-none {
+    border-left-color: #dc3545;
+}
+
+/* Highlight on hover (linked cards) */
+.flow-card.highlight {
+    background: #fff8e6;
+    border-left-color: #e6a700;
+    box-shadow: 0 0 0 2px #ffd43b;
+}
+
+/* Card Content */
+.card-date {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.card-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.card-source {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.card-amount {
+    font-weight: 700;
+    color: var(--color-primary);
+    font-size: 1.1rem;
+}
+
+.card-status {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.status-idle .idle-amount {
+    color: #e67700;
+    font-weight: 500;
+}
+
+.status-done {
+    color: var(--color-profit);
+    font-weight: 500;
+}
+
+.card-notes {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+    margin-bottom: 0.5rem;
+}
+
+/* Card Actions */
+.card-actions {
+    display: flex;
+    gap: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+    margin-top: 0.5rem;
+}
+
+.flow-card:hover .card-actions {
+    opacity: 1;
+}
+
+.btn-action {
+    padding: 0.3rem 0.6rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background 0.2s;
+}
+
+.btn-action.btn-primary {
+    background: var(--color-primary);
+    color: white;
+}
+
+.btn-action.btn-primary:hover {
+    background: var(--color-primary-dark);
+}
+
+.btn-action.btn-secondary {
+    background: var(--color-background);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.btn-action.btn-secondary:hover {
+    background: var(--color-border);
+}
+
+.btn-action.btn-danger {
+    background: transparent;
+    color: #dc3545;
+    font-weight: bold;
+    font-size: 1rem;
+    padding: 0.2rem 0.5rem;
+}
+
+.btn-action.btn-danger:hover {
+    background: #fee;
+}
+
+/* Summary Bar */
+.moneyflow-summary {
+    background: var(--color-surface);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.summary-flow {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.summary-label {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+.summary-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.summary-arrow {
+    font-size: 1.5rem;
+    color: var(--color-text-muted);
+}
+
+.summary-idle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.idle-label {
+    color: var(--color-text-muted);
+}
+
+.idle-value {
+    color: #e67700;
+    font-weight: 600;
+}
+
+.idle-separator {
+    color: var(--color-border);
+    margin: 0 0.5rem;
+}
+
+/* Idle Breakdown Section */
+.idle-breakdown-section {
+    margin-top: 1rem;
+}
+
+.breakdown-toggle {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.breakdown-toggle:hover {
+    background: var(--color-background);
+}
+
+.breakdown-content {
+    margin-top: 0.5rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.breakdown-group {
+    margin-bottom: 1rem;
+}
+
+.breakdown-group:last-child {
+    margin-bottom: 0;
+}
+
+.breakdown-group h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+    color: var(--color-text);
+}
+
+.breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-background);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.breakdown-source {
+    color: var(--color-text);
+}
+
+.breakdown-amounts {
+    display: flex;
+    gap: 1rem;
+}
+
+.breakdown-amounts .total {
+    color: var(--color-text-muted);
+}
+
+.breakdown-amounts .idle {
+    color: #e67700;
+    font-weight: 500;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--color-surface);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 450px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: var(--color-text);
+}
+
+.modal-source-info {
+    display: flex;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    background: var(--color-background);
+    font-size: 0.9rem;
+}
+
+.form-group {
+    padding: 0 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.form-group:first-of-type {
+    margin-top: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--color-text);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 0.7rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
+}
+
+.form-remaining {
+    padding: 0.75rem 1.5rem;
+    background: var(--color-background);
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.btn-cancel {
+    padding: 0.6rem 1.25rem;
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-cancel:hover {
+    background: var(--color-border);
+}
+
+.btn-save {
+    padding: 0.6rem 1.25rem;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-save:hover {
+    background: var(--color-primary-dark);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .moneyflow-board {
+        grid-template-columns: 1fr;
+    }
+    
+    .moneyflow-column {
+        min-height: auto;
+        max-height: none;
+    }
+    
+    .moneyflow-summary {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .summary-idle {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ============================================
+// Constants
+// ============================================
+const API_BASE = '/moneyflow/api';
+
+// ============================================
+// Utility Functions
+// ============================================
+function formatCurrency(amount) {
+    return '₹' + parseInt(amount).toLocaleString('en-IN');
+}
+
+function getTodayDate() {
+    return new Date().toISOString().split('T')[0];
+}
+
+function showError(message) {
+    alert('Error: ' + message);
+}
+
+function showSuccess(message) {
+    // Simple success feedback - can be enhanced with toast notifications
+    console.log('Success:', message);
+}
+
+// ============================================
+// Modal Functions
+// ============================================
+function openModal(type) {
+    document.getElementById(type + 'Modal').classList.add('active');
+}
+
+function closeModal(type) {
+    document.getElementById(type + 'Modal').classList.remove('active');
+    // Reset forms
+    const form = document.getElementById(type + 'Form');
+    if (form) form.reset();
+}
+
+// Bank Transfer Modal
+function openBankModal() {
+    document.getElementById('bankModalTitle').textContent = '🏦 New Bank Transfer';
+    document.getElementById('bankEditId').value = '';
+    document.getElementById('bankDate').value = getTodayDate();
+    openModal('bank');
+}
+
+function openEditBankModal(id) {
+    document.getElementById('bankModalTitle').textContent = '🏦 Edit Bank Transfer';
+    document.getElementById('bankEditId').value = id;
+    
+    // Fetch current data
+    fetch(`${API_BASE}/bank-transfers/${id}`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('bankDate').value = data.date;
+            document.getElementById('bankSource').value = data.source_bank;
+            document.getElementById('bankAmount').value = data.amount;
+            document.getElementById('bankNotes').value = data.notes || '';
+            openModal('bank');
+        })
+        .catch(err => showError('Failed to load data'));
+}
+
+// Allocate Modal (from Bank card)
+function openAllocateModal(bankId, bankName, bankDate, idleAmount) {
+    document.getElementById('allocateBankId').value = bankId;
+    document.getElementById('allocateSource').textContent = `${bankName} - ${bankDate}`;
+    document.getElementById('allocateAvailable').textContent = formatCurrency(idleAmount);
+    document.getElementById('allocateMaxAmount').value = idleAmount;
+    document.getElementById('allocateDate').value = getTodayDate();
+    document.getElementById('allocateAmount').value = '';
+    document.getElementById('allocateRemaining').textContent = formatCurrency(idleAmount);
+    openModal('allocate');
+}
+
+function openAllocateModalFromButton(button) {
+    openAllocateModal(
+        button.dataset.bankId,
+        button.dataset.bankName,
+        button.dataset.bankDate,
+        button.dataset.idleAmount
+    );
+}
+
+// Broker Modal (direct add)
+function openBrokerModal() {
+    document.getElementById('brokerModalTitle').textContent = '💳 New Broker Credit';
+    document.getElementById('brokerEditId').value = '';
+    document.getElementById('brokerDate').value = getTodayDate();
+    openModal('broker');
+}
+
+function openEditBrokerModal(id) {
+    document.getElementById('brokerModalTitle').textContent = '💳 Edit Broker Credit';
+    document.getElementById('brokerEditId').value = id;
+    
+    fetch(`${API_BASE}/broker-credits/${id}`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('brokerBankTransfer').value = data.bank_transfer_id;
+            document.getElementById('brokerDate').value = data.date;
+            document.getElementById('brokerDestination').value = data.destination;
+            document.getElementById('brokerDestinationType').value = data.destination_type;
+            document.getElementById('brokerAmount').value = data.amount;
+            document.getElementById('brokerNotes').value = data.notes || '';
+            openModal('broker');
+        })
+        .catch(err => showError('Failed to load data'));
+}
+
+// Invest Modal (from Broker card)
+function openInvestModal(brokerId, brokerName, brokerDate, idleAmount) {
+    document.getElementById('investBrokerId').value = brokerId;
+    document.getElementById('investSource').textContent = `${brokerName} - ${brokerDate}`;
+    document.getElementById('investAvailable').textContent = formatCurrency(idleAmount);
+    document.getElementById('investMaxAmount').value = idleAmount;
+    document.getElementById('investDate').value = getTodayDate();
+    document.getElementById('investAmount').value = '';
+    document.getElementById('investRemaining').textContent = formatCurrency(idleAmount);
+    openModal('invest');
+}
+
+function openInvestModalFromButton(button) {
+    openInvestModal(
+        button.dataset.brokerId,
+        button.dataset.brokerName,
+        button.dataset.brokerDate,
+        button.dataset.idleAmount
+    );
+}
+
+// Investment Modal (direct add)
+function openInvestmentModal() {
+    document.getElementById('investmentModalTitle').textContent = '📈 New Investment';
+    document.getElementById('investmentEditId').value = '';
+    document.getElementById('investmentDate').value = getTodayDate();
+    openModal('investment');
+}
+
+function openEditInvestmentModal(id) {
+    document.getElementById('investmentModalTitle').textContent = '📈 Edit Investment';
+    document.getElementById('investmentEditId').value = id;
+    
+    fetch(`${API_BASE}/investments/${id}`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('investmentBrokerCredit').value = data.broker_credit_id;
+            document.getElementById('investmentDate').value = data.date;
+            document.getElementById('investmentHolding').value = data.holding_name;
+            document.getElementById('investmentAmount').value = data.amount;
+            document.getElementById('investmentNotes').value = data.notes || '';
+            openModal('investment');
+        })
+        .catch(err => showError('Failed to load data'));
+}
+
+// ============================================
+// Form Helpers
+// ============================================
+function updateDestinationType() {
+    const select = document.getElementById('allocateDestination');
+    const selected = select.options[select.selectedIndex];
+    const type = selected.dataset.type || 'broker';
+    document.getElementById('allocateDestinationType').value = type;
+}
+
+function updateBrokerDestinationType() {
+    const select = document.getElementById('brokerDestination');
+    const selected = select.options[select.selectedIndex];
+    const type = selected.dataset.type || 'broker';
+    document.getElementById('brokerDestinationType').value = type;
+}
+
+function updateAllocateRemaining() {
+    const max = parseFloat(document.getElementById('allocateMaxAmount').value) || 0;
+    const amount = parseFloat(document.getElementById('allocateAmount').value) || 0;
+    const remaining = max - amount;
+    document.getElementById('allocateRemaining').textContent = formatCurrency(remaining);
+}
+
+function updateInvestRemaining() {
+    const max = parseFloat(document.getElementById('investMaxAmount').value) || 0;
+    const amount = parseFloat(document.getElementById('investAmount').value) || 0;
+    const remaining = max - amount;
+    document.getElementById('investRemaining').textContent = formatCurrency(remaining);
+}
+
+// ============================================
+// API Functions
+// ============================================
+async function saveBank(event) {
+    event.preventDefault();
+    
+    const editId = document.getElementById('bankEditId').value;
+    const data = {
+        date: document.getElementById('bankDate').value,
+        source_bank: document.getElementById('bankSource').value,
+        amount: parseFloat(document.getElementById('bankAmount').value),
+        notes: document.getElementById('bankNotes').value || null
+    };
+    
+    const url = editId ? `${API_BASE}/bank-transfers/${editId}` : `${API_BASE}/bank-transfers`;
+    const method = editId ? 'PUT' : 'POST';
+    
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to save');
+        }
+        
+        showSuccess('Bank transfer saved');
+        closeModal('bank');
+        location.reload();
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+async function saveAllocate(event) {
+    event.preventDefault();
+    
+    const data = {
+        bank_transfer_id: parseInt(document.getElementById('allocateBankId').value),
+        date: document.getElementById('allocateDate').value,
+        destination: document.getElementById('allocateDestination').value,
+        destination_type: document.getElementById('allocateDestinationType').value,
+        amount: parseFloat(document.getElementById('allocateAmount').value),
+        notes: document.getElementById('allocateNotes').value || null
+    };
+    
+    try {
+        const res = await fetch(`${API_BASE}/broker-credits`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to save');
+        }
+        
+        showSuccess('Allocation saved');
+        closeModal('allocate');
+        location.reload();
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+async function saveBrokerDirect(event) {
+    event.preventDefault();
+    
+    const editId = document.getElementById('brokerEditId').value;
+    const data = {
+        bank_transfer_id: parseInt(document.getElementById('brokerBankTransfer').value),
+        date: document.getElementById('brokerDate').value,
+        destination: document.getElementById('brokerDestination').value,
+        destination_type: document.getElementById('brokerDestinationType').value,
+        amount: parseFloat(document.getElementById('brokerAmount').value),
+        notes: document.getElementById('brokerNotes').value || null
+    };
+    
+    const url = editId ? `${API_BASE}/broker-credits/${editId}` : `${API_BASE}/broker-credits`;
+    const method = editId ? 'PUT' : 'POST';
+    
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to save');
+        }
+        
+        showSuccess('Broker credit saved');
+        closeModal('broker');
+        location.reload();
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+async function saveInvest(event) {
+    event.preventDefault();
+    
+    const data = {
+        broker_credit_id: parseInt(document.getElementById('investBrokerId').value),
+        date: document.getElementById('investDate').value,
+        holding_name: document.getElementById('investHolding').value,
+        amount: parseFloat(document.getElementById('investAmount').value),
+        notes: document.getElementById('investNotes').value || null
+    };
+    
+    try {
+        const res = await fetch(`${API_BASE}/investments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to save');
+        }
+        
+        showSuccess('Investment saved');
+        closeModal('invest');
+        location.reload();
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+async function saveInvestmentDirect(event) {
+    event.preventDefault();
+    
+    const editId = document.getElementById('investmentEditId').value;
+    const data = {
+        broker_credit_id: parseInt(document.getElementById('investmentBrokerCredit').value),
+        date: document.getElementById('investmentDate').value,
+        holding_name: document.getElementById('investmentHolding').value,
+        amount: parseFloat(document.getElementById('investmentAmount').value),
+        notes: document.getElementById('investmentNotes').value || null
+    };
+    
+    const url = editId ? `${API_BASE}/investments/${editId}` : `${API_BASE}/investments`;
+    const method = editId ? 'PUT' : 'POST';
+    
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to save');
+        }
+        
+        showSuccess('Investment saved');
+        closeModal('investment');
+        location.reload();
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+async function deleteEntry(type, id) {
+    if (!confirm('Are you sure you want to delete this entry? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${API_BASE}/${type}/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to delete');
+        }
+        
+        showSuccess('Entry deleted');
+        location.reload();
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+// ============================================
+// Filter Function
+// ============================================
+function filterByMonth(month) {
+    const url = new URL(window.location.href);
+    if (month) {
+        url.searchParams.set('month', month);
+    } else {
+        url.searchParams.delete('month');
+    }
+    window.location.href = url.toString();
+}
+
+// ============================================
+// Breakdown Toggle
+// ============================================
+function toggleBreakdown() {
+    const content = document.getElementById('breakdownContent');
+    const arrow = document.getElementById('breakdownArrow');
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+    } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+    }
+}
+
+// ============================================
+// Card Hover Highlighting
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.flow-card');
+    
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            const type = this.dataset.type;
+            const id = this.dataset.id;
+            const parentId = this.dataset.parentId;
+            
+            // Highlight this card
+            this.classList.add('highlight');
+            
+            if (type === 'bank') {
+                // Highlight all broker credits from this bank transfer
+                document.querySelectorAll(`.flow-card[data-parent-id="${id}"]`).forEach(c => {
+                    c.classList.add('highlight');
+                    // And their investments
+                    const bcId = c.dataset.id;
+                    document.querySelectorAll(`.flow-card[data-parent-id="${bcId}"]`).forEach(inv => {
+                        inv.classList.add('highlight');
+                    });
+                });
+            } else if (type === 'broker') {
+                // Highlight parent bank transfer
+                document.querySelector(`.flow-card[data-type="bank"][data-id="${parentId}"]`)?.classList.add('highlight');
+                // Highlight child investments
+                document.querySelectorAll(`.flow-card[data-parent-id="${id}"]`).forEach(c => {
+                    c.classList.add('highlight');
+                });
+            } else if (type === 'investment') {
+                // Highlight parent broker credit
+                const brokerCard = document.querySelector(`.flow-card[data-type="broker"][data-id="${parentId}"]`);
+                if (brokerCard) {
+                    brokerCard.classList.add('highlight');
+                    // Highlight grandparent bank transfer
+                    const bankId = brokerCard.dataset.parentId;
+                    document.querySelector(`.flow-card[data-type="bank"][data-id="${bankId}"]`)?.classList.add('highlight');
+                }
+            }
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            // Remove highlight from all cards
+            document.querySelectorAll('.flow-card.highlight').forEach(c => {
+                c.classList.remove('highlight');
+            });
+        });
+    });
+});
+
+// ============================================
+// Modal Close Handlers
+// ============================================
+document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.classList.remove('active');
+        }
+    });
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal.active').forEach(modal => {
+            modal.classList.remove('active');
+        });
+    }
+});
+</script>
+{% endblock %}

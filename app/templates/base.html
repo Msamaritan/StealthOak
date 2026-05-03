@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -30,6 +30,11 @@
                 <li>
                     <a href="/mutualfunds" class="{% if '/mutualfunds' in request.url.path %}active{% endif %}">
                         💼 Mutual Funds
+                    </a>
+                </li>
+                <li>
+                    <a href="/moneyflow" class="nav-item {% if '/moneyflow' in request.url.path %}active{% endif %}">
+                        💸 Money Flow
                     </a>
                 </li>
             </ul>
