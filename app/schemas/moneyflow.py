@@ -157,6 +157,76 @@ class MoneyFlowInvestmentResponse(BaseModel):
 
 
 # ============================================
+# SIP Schemas
+# ============================================
+
+class ActiveSIPCreate(BaseModel):
+    broker_name: str = Field(min_length=1, max_length=50)
+    holding_name: str = Field(min_length=1, max_length=100)
+    frequency: str = Field(pattern="^(monthly|weekly|Particular Dates)$")
+    weekday: Optional[str] = Field(default=None, pattern="^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$")
+    monthly_day: Optional[int] = Field(default=None, ge=1, le=28)
+    execution_dates: Optional[str] = Field(default=None, max_length=255)  # "3,9,15,21,27" (for Particular Dates)
+    amount: float = Field(gt=0)
+    notes: Optional[str] = Field(default=None, max_length=255)
+
+
+class ActiveSIPUpdate(BaseModel):
+    broker_name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    holding_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    frequency: Optional[str] = Field(default=None, pattern="^(monthly|weekly|Particular Dates)$")
+    weekday: Optional[str] = Field(default=None, pattern="^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$")
+    monthly_day: Optional[int] = Field(default=None, ge=1, le=28)
+    execution_dates: Optional[str] = Field(default=None, max_length=255)  # "3,9,15,21,27" (for Particular Dates)
+    amount: Optional[float] = Field(default=None, gt=0)
+    is_active: Optional[bool] = None
+    notes: Optional[str] = Field(default=None, max_length=255)
+
+
+class ActiveSIPResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    broker_name: str
+    holding_name: str
+    frequency: str
+    weekday: Optional[str]
+    monthly_day: Optional[int]
+    execution_dates: Optional[str]
+    amount: float
+    is_active: bool
+    notes: Optional[str]
+    last_executed_on: Optional[dt.date]
+    created_at: dt.datetime
+
+
+class RunSIPsRequest(BaseModel):
+    broker_credit_id: int
+    execution_date: dt.date
+
+
+class RunCoinSIPsRequest(BaseModel):
+    bank_transfer_id: int
+    sip_month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    execution_date: Optional[dt.date] = None  # Deprecated: kept for backward compatibility
+
+
+class RunZerodhaSIPsRequest(BaseModel):
+    broker_credit_id: int
+    sip_month: str = Field(pattern=r"^\d{4}-\d{2}$")
+
+
+class RunSIPsResponse(BaseModel):
+    broker_credit_id: int
+    execution_date: dt.date
+    total_allocated: float
+    allocated_count: int
+    skipped_count: int
+    allocated_holdings: List[str]
+    skipped_holdings: List[str]
+
+
+# ============================================
 # Summary / Stats Schemas
 # ============================================
 

@@ -4,7 +4,7 @@ Money Flow Models - Track money from Bank → Broker → Investments
 
 import datetime as dt
 from typing import Optional, List
-from sqlalchemy import String, Float, Date, DateTime, ForeignKey, func
+from sqlalchemy import String, Float, Date, DateTime, ForeignKey, Boolean, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -144,3 +144,27 @@ class MoneyFlowInvestment(Base):
 
     def __repr__(self) -> str:
         return f"<MoneyFlowInvestment {self.holding_name} ₹{self.amount} on {self.date}>"
+
+
+class ActiveSIP(Base):
+    """Recurring SIP configuration for broker-based investments."""
+
+    __tablename__ = "active_sips"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    broker_name: Mapped[str] = mapped_column(String(50), nullable=False)  # Zerodha / Coin
+    holding_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    frequency: Mapped[str] = mapped_column(String(20), nullable=False, default="monthly")  # monthly / weekly
+    weekday: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)  # Monday..Sunday (weekly only)
+    monthly_day: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 1..28 (monthly only)
+    execution_dates: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # "3,9,15,21,27" (comma-separated dates)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    notes: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_executed_on: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<ActiveSIP {self.broker_name}:{self.holding_name} ₹{self.amount} {self.frequency}>"

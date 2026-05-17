@@ -9,7 +9,7 @@ No complex provider system — just works.
 
 import asyncio
 import warnings
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as dt_date
 from typing import Optional, List, Dict, Any
 
 import httpx
@@ -210,6 +210,77 @@ class PriceFetcher:
         self.cache.set(cache_key, price_data)
         print(f"🌐 Fetched: {symbol}")
         return price_data
+
+    async def get_stock_price_on_or_before(
+        self,
+        symbol: str,
+        target_date: dt_date,
+        exchange: str = "NSE",
+        max_lookback_days: int = 10,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Fetch stock close price on target_date.
+        If market data is unavailable for target_date (holiday/weekend),
+        fall back to the most recent available close before target_date.
+        """
+        cache_key = f"stock_hist_{symbol}_{exchange}_{target_date.isoformat()}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+
+        suffix = ".NS" if exchange.upper() == "NSE" else ".BO"
+        yahoo_symbol = f"{symbol}{suffix}"
+
+        window_start = datetime.combine(target_date - timedelta(days=max_lookback_days), datetime.min.time())
+        window_end = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+        period1 = int(window_start.timestamp())
+        period2 = int(window_end.timestamp())
+
+        url = (
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}"
+            f"?interval=1d&period1={period1}&period2={period2}"
+        )
+
+        data = await self._request_with_retry(url, self.headers, f"Stock hist: {symbol}")
+        if not data:
+            return None
+
+        result = data.get("chart", {}).get("result", [])
+        if not result:
+            return None
+
+        payload = result[0]
+        timestamps = payload.get("timestamp", [])
+        closes = payload.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        if not timestamps or not closes:
+            return None
+
+        best_date: Optional[dt_date] = None
+        best_price: Optional[float] = None
+
+        for ts, close_value in zip(timestamps, closes):
+            if close_value is None:
+                continue
+            candle_date = datetime.fromtimestamp(ts).date()
+            if candle_date <= target_date:
+                if best_date is None or candle_date > best_date:
+                    best_date = candle_date
+                    best_price = float(close_value)
+
+        if best_date is None or best_price is None:
+            return None
+
+        response = {
+            "asset_type": "stock",
+            "symbol": symbol,
+            "exchange": exchange.upper(),
+            "price": round(best_price, 4),
+            "price_date": best_date.isoformat(),
+            "requested_date": target_date.isoformat(),
+            "is_fallback": best_date != target_date,
+        }
+        self.cache.set(cache_key, response)
+        return response
     
     async def get_multiple_stock_prices(
         self, 
@@ -283,6 +354,68 @@ class PriceFetcher:
             
             return result
         return None
+
+    async def get_mf_nav_on_or_before(
+        self,
+        scheme_code: str,
+        target_date: dt_date,
+        max_lookback_days: int = 15,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Fetch MF NAV on target_date.
+        Falls back to nearest available NAV before target_date.
+        """
+        cache_key = f"mf_hist_{scheme_code}_{target_date.isoformat()}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+
+        url = f"{self.mf_api_url}/mf/{scheme_code}"
+        data = await self._request_with_retry(url, None, f"MF hist: {scheme_code}")
+        if not data or data.get("status") != "SUCCESS":
+            return None
+
+        data_list = data.get("data", [])
+        if not data_list:
+            return None
+
+        lookback_limit = target_date - timedelta(days=max_lookback_days)
+        best_date: Optional[dt_date] = None
+        best_nav: Optional[float] = None
+
+        for item in data_list:
+            nav_date_str = item.get("date")
+            nav_str = item.get("nav")
+            if not nav_date_str or not nav_str:
+                continue
+
+            try:
+                nav_date = datetime.strptime(nav_date_str, "%d-%m-%Y").date()
+                nav_value = float(nav_str)
+            except (ValueError, TypeError):
+                continue
+
+            if nav_date > target_date or nav_date < lookback_limit:
+                continue
+
+            if best_date is None or nav_date > best_date:
+                best_date = nav_date
+                best_nav = nav_value
+
+        if best_date is None or best_nav is None:
+            return None
+
+        response = {
+            "asset_type": "mutual_fund",
+            "scheme_code": scheme_code,
+            "scheme_name": data.get("meta", {}).get("scheme_name"),
+            "price": round(best_nav, 4),
+            "price_date": best_date.isoformat(),
+            "requested_date": target_date.isoformat(),
+            "is_fallback": best_date != target_date,
+        }
+        self.cache.set(cache_key, response)
+        return response
     
     async def get_multiple_mf_navs(
         self, 

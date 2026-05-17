@@ -43,11 +43,11 @@
                         <div class="card-date">{{ bt.date.strftime('%d %b %Y') }}</div>
                         <div class="card-details">
                             <span class="card-source">{{ bt.source_bank }}</span>
-                            <span class="card-amount">₹{{ "{:,.0f}".format(bt.amount) }}</span>
+                            <span class="card-amount">₹{{ "{:,.2f}".format(bt.amount) }}</span>
                         </div>
                         {% if bt.idle_amount > 0 %}
                         <div class="card-status status-idle">
-                            <span class="idle-amount">₹{{ "{:,.0f}".format(bt.idle_amount) }} idle</span>
+                            <span class="idle-amount">₹{{ "{:,.2f}".format(bt.idle_amount) }} idle</span>
                         </div>
                         {% else %}
                         <div class="card-status status-done">
@@ -104,7 +104,7 @@
                         <div class="card-date">{{ bc.date.strftime('%d %b %Y') }}</div>
                         <div class="card-details">
                             <span class="card-source">→ {{ bc.destination }}</span>
-                            <span class="card-amount">₹{{ "{:,.0f}".format(bc.amount) }}</span>
+                            <span class="card-amount">₹{{ "{:,.2f}".format(bc.amount) }}</span>
                         </div>
                         {% if bc.destination_type == 'savings' %}
                         <div class="card-status status-done">
@@ -112,7 +112,7 @@
                         </div>
                         {% elif bc.idle_amount > 0 %}
                         <div class="card-status status-idle">
-                            <span class="idle-amount">₹{{ "{:,.0f}".format(bc.idle_amount) }} idle</span>
+                            <span class="idle-amount">₹{{ "{:,.2f}".format(bc.idle_amount) }} idle</span>
                         </div>
                         {% else %}
                         <div class="card-status status-done">
@@ -123,7 +123,8 @@
                         <div class="card-notes">{{ bc.notes }}</div>
                         {% endif %}
                         <div class="card-actions">
-                            {% if bc.destination_type == 'broker' and bc.idle_amount > 0 %}
+                            {% if bc.destination_type == 'broker' %}
+                            {% if bc.idle_amount > 0 %}
                             <button
                                 class="btn-action btn-primary"
                                 data-broker-id="{{ bc.id }}"
@@ -131,6 +132,17 @@
                                 data-broker-date="{{ bc.date.strftime('%d %b %Y') }}"
                                 data-idle-amount="{{ bc.idle_amount }}"
                                 onclick="openInvestModalFromButton(this)">Invest</button>
+                            {% endif %}
+                            {% if bc.destination|lower == 'zerodha' and 'zerodha' in active_sip_brokers_lower %}
+                            <button
+                                class="btn-action btn-secondary"
+                                data-broker-id="{{ bc.id }}"
+                                data-broker-name="{{ bc.destination }}"
+                                data-broker-month="{{ bc.date.strftime('%Y-%m') }}"
+                                data-idle-amount="{{ bc.idle_amount }}"
+                                {% if bc.idle_amount <= 0 %}disabled title="No idle amount available"{% endif %}
+                                onclick="openRunSIPModalFromButton(this)">Run SIPs</button>
+                            {% endif %}
                             {% endif %}
                             <button class="btn-action btn-secondary" onclick="openEditBrokerModal('{{ bc.id }}')">Edit</button>
                             <button class="btn-action btn-danger" onclick="deleteEntry('broker-credits', '{{ bc.id }}')">×</button>
@@ -166,10 +178,13 @@
                         <div class="card-date">{{ inv.date.strftime('%d %b %Y') }}</div>
                         <div class="card-details">
                             <span class="card-source">{{ inv.holding_name }}</span>
-                            <span class="card-amount">₹{{ "{:,.0f}".format(inv.amount) }}</span>
+                            <span class="card-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
                         </div>
                         {% if inv.notes %}
-                        <div class="card-notes">{{ inv.notes }}</div>
+                        <div class="card-notes" data-notes="{{ inv.notes }}">
+                            <span class="sip-frequency-display"></span>
+                            <span class="sip-dates-display" style="display: block; margin-top: 0.25rem; font-size: 0.7rem;"></span>
+                        </div>
                         {% endif %}
                         <div class="card-actions">
                             <button class="btn-action btn-secondary" onclick="openEditInvestmentModal('{{ inv.id }}')">Edit</button>
@@ -193,25 +208,25 @@
         <div class="summary-flow">
             <div class="summary-item">
                 <span class="summary-label">🏦 Bank</span>
-                <span class="summary-value">₹{{ "{:,.0f}".format(summary.total_bank_transfers) }}</span>
+                <span class="summary-value">₹{{ "{:,.2f}".format(summary.total_bank_transfers) }}</span>
             </div>
             <span class="summary-arrow">→</span>
             <div class="summary-item">
                 <span class="summary-label">💳 Broker</span>
-                <span class="summary-value">₹{{ "{:,.0f}".format(summary.total_broker_credits) }}</span>
+                <span class="summary-value">₹{{ "{:,.2f}".format(summary.total_broker_credits) }}</span>
             </div>
             <span class="summary-arrow">→</span>
             <div class="summary-item">
                 <span class="summary-label">📈 Invested</span>
-                <span class="summary-value">₹{{ "{:,.0f}".format(summary.total_invested) }}</span>
+                <span class="summary-value">₹{{ "{:,.2f}".format(summary.total_invested) }}</span>
             </div>
         </div>
         <div class="summary-idle">
             <span class="idle-label">Idle at Bank:</span>
-            <span class="idle-value">₹{{ "{:,.0f}".format(summary.idle_at_bank) }}</span>
+            <span class="idle-value">₹{{ "{:,.2f}".format(summary.idle_at_bank) }}</span>
             <span class="idle-separator">|</span>
             <span class="idle-label">Idle at Broker:</span>
-            <span class="idle-value">₹{{ "{:,.0f}".format(summary.idle_at_broker) }}</span>
+            <span class="idle-value">₹{{ "{:,.2f}".format(summary.idle_at_broker) }}</span>
         </div>
     </div>
 
@@ -230,8 +245,8 @@
                     <div class="breakdown-item">
                         <span class="breakdown-source">{{ item.source }} - {{ item.date.strftime('%d %b %Y') }}</span>
                         <span class="breakdown-amounts">
-                            <span class="total">₹{{ "{:,.0f}".format(item.total_amount) }}</span>
-                            <span class="idle">₹{{ "{:,.0f}".format(item.idle_amount) }} idle</span>
+                            <span class="total">₹{{ "{:,.2f}".format(item.total_amount) }}</span>
+                            <span class="idle">₹{{ "{:,.2f}".format(item.idle_amount) }} idle</span>
                         </span>
                     </div>
                     {% endfor %}
@@ -246,8 +261,8 @@
                     <div class="breakdown-item">
                         <span class="breakdown-source">{{ item.source }} - {{ item.date.strftime('%d %b %Y') }}</span>
                         <span class="breakdown-amounts">
-                            <span class="total">₹{{ "{:,.0f}".format(item.total_amount) }}</span>
-                            <span class="idle">₹{{ "{:,.0f}".format(item.idle_amount) }} idle</span>
+                            <span class="total">₹{{ "{:,.2f}".format(item.total_amount) }}</span>
+                            <span class="idle">₹{{ "{:,.2f}".format(item.idle_amount) }} idle</span>
                         </span>
                     </div>
                     {% endfor %}
@@ -258,6 +273,199 @@
     </div>
     {% endif %}
 
+    <!-- Active SIPs (Expandable) -->
+    <div class="active-sips-section">
+        <button class="breakdown-toggle" onclick="toggleSIPs()">
+            🔁 Active SIPs <span id="sipsArrow">▼</span>
+        </button>
+        <div id="sipsContent" class="breakdown-content" style="display: none;">
+            <div class="sip-header-actions">
+                <button class="btn-add" type="button" onclick="openSIPModal()">+ Add SIP</button>
+            </div>
+
+            <div class="breakdown-group">
+                <h4>🟦 Zerodha SIPs</h4>
+                <div class="sip-header-actions">
+                    <button class="btn-add" type="button" onclick="openRunZerodhaSIPModal()" {% if 'zerodha' not in active_sip_brokers_lower %}disabled title="No active Zerodha SIPs"{% endif %}>Run Zerodha SIPs</button>
+                </div>
+                <div class="breakdown-list">
+                    {% if zerodha_sips %}
+                        {% for sip in zerodha_sips %}
+                        <div class="breakdown-item sip-item">
+                            <span class="breakdown-source">
+                                {{ sip.holding_name }}
+                                <small class="sip-meta">
+                                    ({{ sip.frequency }}{% if sip.frequency == 'weekly' %} - {{ sip.weekday }}{% elif sip.frequency == 'Particular Dates' %} - {{ sip.execution_dates }}{% else %} - day {{ sip.monthly_day }}{% endif %})
+                                </small>
+                            </span>
+                            <span class="breakdown-amounts">
+                                <span class="idle">₹{{ "{:,.2f}".format(sip.amount) }}</span>
+                                <div class="sip-actions">
+                                    <button class="btn-sip-action btn-edit" data-sip-id="{{ sip.id }}" data-broker-name="{{ sip.broker_name }}" data-holding-name="{{ sip.holding_name }}" data-frequency="{{ sip.frequency }}" data-weekday="{{ sip.weekday or '' }}" data-monthly-day="{{ sip.monthly_day or '' }}" data-execution-dates="{{ sip.execution_dates or '' }}" data-amount="{{ sip.amount }}" data-notes="{{ sip.notes or '' }}" onclick="openEditSIPFromButton(this)" title="Edit SIP">✎</button>
+                                    <button class="btn-sip-action btn-delete" data-sip-id="{{ sip.id }}" onclick="deleteSIPFromButton(this)" title="Delete SIP">×</button>
+                                </div>
+                            </span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="breakdown-item">
+                            <span class="breakdown-source">No active SIPs</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="breakdown-group">
+                <h4>🟨 Coin SIPs</h4>
+                <div class="sip-header-actions">
+                    <button class="btn-add" type="button" onclick="openRunCoinSIPModal()" {% if 'coin' not in active_sip_brokers_lower %}disabled title="No active Coin SIPs"{% endif %}>Run Coin SIPs</button>
+                </div>
+                <div class="breakdown-list">
+                    {% if coin_sips %}
+                        {% for sip in coin_sips %}
+                        <div class="breakdown-item sip-item">
+                            <span class="breakdown-source">
+                                {{ sip.holding_name }}
+                                <small class="sip-meta">
+                                    ({{ sip.frequency }}{% if sip.frequency == 'weekly' %} - {{ sip.weekday }}{% elif sip.frequency == 'Particular Dates' %} - {{ sip.execution_dates }}{% else %} - day {{ sip.monthly_day }}{% endif %})
+                                </small>
+                            </span>
+                            <span class="breakdown-amounts">
+                                <span class="idle">₹{{ "{:,.2f}".format(sip.amount) }}</span>
+                                <div class="sip-actions">
+                                    <button class="btn-sip-action btn-edit" data-sip-id="{{ sip.id }}" data-broker-name="{{ sip.broker_name }}" data-holding-name="{{ sip.holding_name }}" data-frequency="{{ sip.frequency }}" data-weekday="{{ sip.weekday or '' }}" data-monthly-day="{{ sip.monthly_day or '' }}" data-execution-dates="{{ sip.execution_dates or '' }}" data-amount="{{ sip.amount }}" data-notes="{{ sip.notes or '' }}" onclick="openEditSIPFromButton(this)" title="Edit SIP">✎</button>
+                                    <button class="btn-sip-action btn-delete" data-sip-id="{{ sip.id }}" onclick="deleteSIPFromButton(this)" title="Delete SIP">×</button>
+                                </div>
+                            </span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="breakdown-item">
+                            <span class="breakdown-source">No active SIPs</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal: Add/Edit SIP -->
+<div id="sipModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="sipModalTitle">🔁 New SIP</h2>
+            <button class="modal-close" onclick="closeModal('sip')">&times;</button>
+        </div>
+        <form id="sipForm" onsubmit="saveSIP(event)">
+            <input type="hidden" id="sipEditId" value="">
+            <div class="form-group">
+                <label for="sipBroker">Broker</label>
+                <select id="sipBroker" required>
+                    <option value="">Select Broker</option>
+                    <option value="Zerodha">Zerodha</option>
+                    <option value="Coin">Coin</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="sipHolding">MF/Stock Name</label>
+                <input type="text" id="sipHolding" required maxlength="100" placeholder="e.g., HDFC Flexi Cap">
+            </div>
+            <div class="form-group">
+                <label for="sipFrequency">Frequency</label>
+                <select id="sipFrequency" required onchange="toggleSIPFrequencyFields()">
+                    <option value="monthly">Monthly</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="Particular Dates">Particular Dates</option>
+                </select>
+            </div>
+            <div class="form-group" id="sipWeekdayGroup" style="display: none;">
+                <label for="sipWeekday">Weekly Day</label>
+                <select id="sipWeekday">
+                    <option value="Monday">Monday</option>
+                    <option value="Tuesday">Tuesday</option>
+                    <option value="Wednesday">Wednesday</option>
+                    <option value="Thursday" selected>Thursday</option>
+                    <option value="Friday">Friday</option>
+                    <option value="Saturday">Saturday</option>
+                    <option value="Sunday">Sunday</option>
+                </select>
+            </div>
+            <div class="form-group" id="sipMonthlyDayGroup">
+                <label for="sipMonthlyDay">Monthly Day</label>
+                <input type="number" id="sipMonthlyDay" min="1" max="28" value="5">
+            </div>
+            <div class="form-group" id="sipExecutionDatesGroup" style="display: none;">
+                <label>Select Execution Dates</label>
+                <div class="sip-dates-grid">
+                    <div class="sip-dates-checkbox-grid">
+                        {% for day in range(1, 29) %}
+                        <label class="sip-date-checkbox">
+                            <input type="checkbox" class="sip-date-check" value="{{ day }}" data-day="{{ day }}">
+                            <span>{{ day }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <small style="color: #666; margin-top: 0.5rem; display: block;">e.g., select 3, 9, 15, 21, 27 for 5x per month</small>
+            </div>
+            <div class="form-group">
+                <label for="sipAmount">Amount (₹)</label>
+                <input type="number" id="sipAmount" min="0.01" step="0.01" required placeholder="5000.50">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeModal('sip')">Cancel</button>
+                <button type="submit" class="btn-save">Save SIP</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Run SIPs -->
+<div id="runSIPModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>⚡ Run Active SIPs</h2>
+            <button class="modal-close" onclick="closeModal('runSIP')">&times;</button>
+        </div>
+        <div class="modal-source-info">
+            <span>Broker: <strong id="runSIPBroker">-</strong></span>
+            <span>Idle Available: <strong id="runSIPIdle">₹0</strong></span>
+        </div>
+        <form id="runSIPForm" onsubmit="runDueSIPs(event)">
+            <input type="hidden" id="runSIPMode" value="broker">
+            <input type="hidden" id="runSIPBrokerCreditId" value="">
+            <input type="hidden" id="runSIPBrokerName" value="">
+            <div class="form-group" id="runSIPMonthGroup">
+                <label for="runSIPMonth">SIP Month (verify and change if needed)</label>
+                <input type="month" id="runSIPMonth" value="{{ current_month }}" onchange="onRunSIPMonthChange()">
+            </div>
+            <div class="form-group" id="runSIPBankTransferGroup" style="display: none;">
+                <label for="runSIPBankTransfer">Bank Transfer for selected month</label>
+                <select id="runSIPBankTransfer" onchange="onRunSIPBankTransferChange()"></select>
+            </div>
+            <div class="form-group" id="runSIPBrokerCreditGroup" style="display: none;">
+                <label for="runSIPBrokerCredit">Broker Credit for selected month</label>
+                <select id="runSIPBrokerCredit" onchange="onRunSIPBrokerCreditChange()"></select>
+            </div>
+            <div class="form-group" id="runSIPExecutionDatesGroup">
+                <label for="runSIPDateSelect">Execution Dates (auto-generated from SIP frequency)</label>
+                <select id="runSIPDateSelect" onchange="onRunSIPDateSelectChange()"></select>
+                <input type="hidden" id="runSIPDate" value="">
+                <input type="hidden" id="runSIPExecutionDates" value="">
+            </div>
+            <div class="form-group">
+                <label>Due SIPs</label>
+                <div id="dueSIPPreview" class="due-sip-preview">Select date to preview due SIPs</div>
+                <div id="runSIPWarning" class="run-sip-warning" style="display: none;"></div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeModal('runSIP')">Cancel</button>
+                <button type="submit" class="btn-save" id="runSIPSubmit" disabled>Run SIPs</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Modal: Add Bank Transfer -->
@@ -284,7 +492,7 @@
             </div>
             <div class="form-group">
                 <label for="bankAmount">Amount (₹)</label>
-                <input type="number" id="bankAmount" placeholder="50000" min="1" required>
+                <input type="number" id="bankAmount" placeholder="50000.00" min="0.01" step="0.01" required>
             </div>
             <div class="form-group">
                 <label for="bankNotes">Notes (optional)</label>
@@ -368,7 +576,7 @@
                     {% for bt in bank_transfers %}
                         {% if bt.idle_amount > 0 %}
                         <option value="{{ bt.id }}" data-idle="{{ bt.idle_amount }}">
-                            {{ bt.source_bank }} - {{ bt.date.strftime('%d %b %Y') }} (₹{{ "{:,.0f}".format(bt.idle_amount) }} available)
+                            {{ bt.source_bank }} - {{ bt.date.strftime('%d %b %Y') }} (₹{{ "{:,.2f}".format(bt.idle_amount) }} available)
                         </option>
                         {% endif %}
                     {% endfor %}
@@ -397,7 +605,7 @@
             <input type="hidden" id="brokerDestinationType" value="broker">
             <div class="form-group">
                 <label for="brokerAmount">Amount (₹)</label>
-                <input type="number" id="brokerAmount" placeholder="40000" min="1" required>
+                <input type="number" id="brokerAmount" placeholder="40000.00" min="0.01" step="0.01" required>
             </div>
             <div class="form-group">
                 <label for="brokerNotes">Notes (optional)</label>
@@ -425,17 +633,36 @@
         <form id="investForm" onsubmit="saveInvest(event)">
             <input type="hidden" id="investBrokerId" value="">
             <input type="hidden" id="investMaxAmount" value="0">
+            <input type="hidden" id="investAssetType" value="">
+            <input type="hidden" id="investAssetSymbol" value="">
+            <input type="hidden" id="investAssetExchange" value="">
+            <input type="hidden" id="investAssetSchemeCode" value="">
+            <input type="hidden" id="investUnitPrice" value="">
             <div class="form-group">
                 <label for="investDate">Date</label>
                 <input type="date" id="investDate" required>
             </div>
             <div class="form-group">
+                <label for="investAssetSearch">Search Stock / Mutual Fund</label>
+                <input type="text" id="investAssetSearch" placeholder="Type name or symbol..." autocomplete="off">
+                <small>Select one result before clicking Fetch.</small>
+                <div id="investAssetSearchResults" class="asset-search-results"></div>
+            </div>
+            <div class="form-group">
                 <label for="investHolding">Stock / Mutual Fund</label>
-                <input type="text" id="investHolding" placeholder="e.g., HDFC Flexi Cap, GOLDBEES" required maxlength="100">
+                <input type="text" id="investHolding" placeholder="Selected from search" required maxlength="100" readonly>
+            </div>
+            <div class="form-group unit-price-group">
+                <button type="button" class="btn-action btn-secondary" onclick="fetchHistoricalUnitPrice('invest')">Fetch 1 Unit Price</button>
+                <small id="investUnitPriceInfo">Unit price will appear here after fetch.</small>
+            </div>
+            <div class="form-group">
+                <label for="investUnits">Units</label>
+                <input type="number" id="investUnits" placeholder="e.g., 10.5" min="0.0001" step="0.0001" oninput="updateAmountFromUnits('invest')">
             </div>
             <div class="form-group">
                 <label for="investAmount">Amount (₹)</label>
-                <input type="number" id="investAmount" placeholder="15000" min="1" required oninput="updateInvestRemaining()">
+                <input type="number" id="investAmount" placeholder="15000.50" min="0.01" step="0.01" required oninput="updateInvestRemaining()">
             </div>
             <div class="form-remaining">
                 Remaining after investment: <strong id="investRemaining">₹0</strong>
@@ -461,6 +688,11 @@
         </div>
         <form id="investmentForm" onsubmit="saveInvestmentDirect(event)">
             <input type="hidden" id="investmentEditId" value="">
+            <input type="hidden" id="investmentAssetType" value="">
+            <input type="hidden" id="investmentAssetSymbol" value="">
+            <input type="hidden" id="investmentAssetExchange" value="">
+            <input type="hidden" id="investmentAssetSchemeCode" value="">
+            <input type="hidden" id="investmentUnitPrice" value="">
             <div class="form-group">
                 <label for="investmentBrokerCredit">From Broker Credit</label>
                 <select id="investmentBrokerCredit" required>
@@ -468,7 +700,7 @@
                     {% for bc in broker_credits %}
                         {% if bc.destination_type == 'broker' and bc.idle_amount > 0 %}
                         <option value="{{ bc.id }}" data-idle="{{ bc.idle_amount }}">
-                            {{ bc.destination }} - {{ bc.date.strftime('%d %b %Y') }} (₹{{ "{:,.0f}".format(bc.idle_amount) }} available)
+                            {{ bc.destination }} - {{ bc.date.strftime('%d %b %Y') }} (₹{{ "{:,.2f}".format(bc.idle_amount) }} available)
                         </option>
                         {% endif %}
                     {% endfor %}
@@ -479,12 +711,26 @@
                 <input type="date" id="investmentDate" required>
             </div>
             <div class="form-group">
+                <label for="investmentAssetSearch">Search Stock / Mutual Fund</label>
+                <input type="text" id="investmentAssetSearch" placeholder="Type name or symbol..." autocomplete="off">
+                <small>Select one result before clicking Fetch.</small>
+                <div id="investmentAssetSearchResults" class="asset-search-results"></div>
+            </div>
+            <div class="form-group">
                 <label for="investmentHolding">Stock / Mutual Fund</label>
-                <input type="text" id="investmentHolding" placeholder="e.g., HDFC Flexi Cap, GOLDBEES" required maxlength="100">
+                <input type="text" id="investmentHolding" placeholder="Selected from search" required maxlength="100" readonly>
+            </div>
+            <div class="form-group unit-price-group">
+                <button type="button" class="btn-action btn-secondary" onclick="fetchHistoricalUnitPrice('investment')">Fetch 1 Unit Price</button>
+                <small id="investmentUnitPriceInfo">Unit price will appear here after fetch.</small>
+            </div>
+            <div class="form-group">
+                <label for="investmentUnits">Units</label>
+                <input type="number" id="investmentUnits" placeholder="e.g., 10.5" min="0.0001" step="0.0001" oninput="updateAmountFromUnits('investment')">
             </div>
             <div class="form-group">
                 <label for="investmentAmount">Amount (₹)</label>
-                <input type="number" id="investmentAmount" placeholder="15000" min="1" required>
+                <input type="number" id="investmentAmount" placeholder="15000.50" min="0.01" step="0.01" required>
             </div>
             <div class="form-group">
                 <label for="investmentNotes">Notes (optional)</label>
@@ -759,6 +1005,11 @@
     background: #fee;
 }
 
+.btn-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* Summary Bar */
 .moneyflow-summary {
     background: var(--color-surface);
@@ -900,6 +1151,160 @@
     font-weight: 500;
 }
 
+/* Active SIPs */
+.active-sips-section {
+    margin-top: 1rem;
+}
+
+.sip-header-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+}
+
+.sip-meta {
+    color: var(--color-text-muted);
+    margin-left: 0.35rem;
+}
+
+.sip-item {
+    position: relative;
+}
+
+.sip-actions {
+    display: flex;
+    gap: 0.4rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.sip-item:hover .sip-actions {
+    opacity: 1;
+}
+
+.btn-sip-action {
+    padding: 0.25rem 0.4rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+
+.btn-sip-action.btn-edit {
+    color: #0066cc;
+}
+
+.btn-sip-action.btn-edit:hover {
+    background: rgba(0, 102, 204, 0.1);
+}
+
+.btn-sip-action.btn-delete {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.btn-sip-action.btn-delete:hover {
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.sip-item {
+    position: relative;
+}
+
+.sip-actions {
+    display: flex;
+    gap: 0.4rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.sip-item:hover .sip-actions {
+    opacity: 1;
+}
+
+.btn-sip-action {
+    padding: 0.25rem 0.4rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+
+.btn-sip-action.btn-edit {
+    color: #0066cc;
+}
+
+.btn-sip-action.btn-edit:hover {
+    background: rgba(0, 102, 204, 0.1);
+}
+
+.btn-sip-action.btn-delete {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.btn-sip-action.btn-delete:hover {
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.due-sip-preview {
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-background);
+    padding: 0.75rem;
+    min-height: 52px;
+    font-size: 0.9rem;
+    color: var(--color-text);
+}
+
+.due-sip-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.due-sip-item:last-child {
+    margin-bottom: 0;
+}
+
+.due-sip-date {
+    margin: 0.8rem 0 0.4rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.due-sip-date:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.due-sip-name {
+    flex: 1;
+    min-width: 0;
+}
+
+.due-sip-amount {
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.run-sip-warning {
+    margin-top: 0.5rem;
+    border: 1px solid #f5c16c;
+    background: #fff7e8;
+    color: #8a5200;
+    border-radius: 6px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.85rem;
+}
+
 /* Modal Styles */
 .modal {
     display: none;
@@ -995,6 +1400,93 @@
     box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
 }
 
+.asset-search-results {
+    display: none;
+    margin-top: 0.45rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-surface);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.asset-search-item {
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+}
+
+.asset-search-item:last-child {
+    border-bottom: none;
+}
+
+.asset-search-item:hover {
+    background: var(--color-background);
+}
+
+.asset-search-meta {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+.asset-search-empty {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.unit-price-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.unit-price-group small {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+}
+
+.sip-dates-checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+}
+
+.sip-date-checkbox {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-surface);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.sip-date-checkbox input[type="checkbox"] {
+    margin-right: 0.25rem;
+    width: auto;
+    cursor: pointer;
+}
+
+.sip-date-checkbox input[type="checkbox"]:checked + span {
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.sip-date-checkbox:has(input[type="checkbox"]:checked) {
+    background: rgba(45, 106, 79, 0.1);
+    border-color: var(--color-primary);
+}
+
 .form-remaining {
     padding: 0.75rem 1.5rem;
     background: var(--color-background);
@@ -1067,16 +1559,64 @@
 // Constants
 // ============================================
 const API_BASE = '/moneyflow/api';
+const assetSearchDebounce = {
+    invest: null,
+    investment: null,
+};
 
 // ============================================
 // Utility Functions
 // ============================================
+const currencyFormatter = new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+});
+
 function formatCurrency(amount) {
-    return '₹' + parseInt(amount).toLocaleString('en-IN');
+    const numeric = Number(amount);
+    return '₹' + currencyFormatter.format(Number.isFinite(numeric) ? numeric : 0);
 }
 
 function getTodayDate() {
     return new Date().toISOString().split('T')[0];
+}
+
+function formatDateYMD(dateObj) {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function weekdayIndex(name) {
+    const map = {
+        Sunday: 0,
+        Monday: 1,
+        Tuesday: 2,
+        Wednesday: 3,
+        Thursday: 4,
+        Friday: 5,
+        Saturday: 6,
+    };
+    return map[name];
+}
+
+function adjustForWeekend(dateObj) {
+    /**
+     * If date falls on Saturday (6) or Sunday (0), move to next Monday.
+     * Returns new adjusted date object.
+     */
+    const dow = dateObj.getDay();  // 0=Sunday, 6=Saturday
+    if (dow === 6) {  // Saturday
+        const adjusted = new Date(dateObj);
+        adjusted.setDate(adjusted.getDate() + 2);
+        return adjusted;
+    } else if (dow === 0) {  // Sunday
+        const adjusted = new Date(dateObj);
+        adjusted.setDate(adjusted.getDate() + 1);
+        return adjusted;
+    }
+    return dateObj;
 }
 
 function showError(message) {
@@ -1086,6 +1626,225 @@ function showError(message) {
 function showSuccess(message) {
     // Simple success feedback - can be enhanced with toast notifications
     console.log('Success:', message);
+}
+
+function setRunSIPSubmitState(enabled, warningMessage = '') {
+    const submitBtn = document.getElementById('runSIPSubmit');
+    const warningEl = document.getElementById('runSIPWarning');
+
+    if (submitBtn) {
+        submitBtn.disabled = !enabled;
+    }
+
+    if (!warningEl) {
+        return;
+    }
+
+    if (warningMessage) {
+        warningEl.textContent = warningMessage;
+        warningEl.style.display = 'block';
+    } else {
+        warningEl.textContent = '';
+        warningEl.style.display = 'none';
+    }
+}
+
+function escapeHtml(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function resetInvestmentPricingUi(prefix, clearAmount = false) {
+    const holdingEl = document.getElementById(`${prefix}Holding`);
+    const searchEl = document.getElementById(`${prefix}AssetSearch`);
+    const resultEl = document.getElementById(`${prefix}AssetSearchResults`);
+    const typeEl = document.getElementById(`${prefix}AssetType`);
+    const symbolEl = document.getElementById(`${prefix}AssetSymbol`);
+    const exchangeEl = document.getElementById(`${prefix}AssetExchange`);
+    const schemeEl = document.getElementById(`${prefix}AssetSchemeCode`);
+    const unitPriceEl = document.getElementById(`${prefix}UnitPrice`);
+    const unitInfoEl = document.getElementById(`${prefix}UnitPriceInfo`);
+    const unitsEl = document.getElementById(`${prefix}Units`);
+    const amountEl = document.getElementById(`${prefix}Amount`);
+
+    if (typeEl) typeEl.value = '';
+    if (symbolEl) symbolEl.value = '';
+    if (exchangeEl) exchangeEl.value = '';
+    if (schemeEl) schemeEl.value = '';
+    if (unitPriceEl) unitPriceEl.value = '';
+    if (unitInfoEl) unitInfoEl.textContent = 'Unit price will appear here after fetch.';
+    if (resultEl) {
+        resultEl.innerHTML = '';
+        resultEl.style.display = 'none';
+    }
+    if (unitsEl) unitsEl.value = '';
+    if (holdingEl) holdingEl.value = '';
+    if (searchEl) searchEl.value = '';
+    if (clearAmount && amountEl) amountEl.value = '';
+}
+
+function renderAssetSearchResults(prefix, assets, query) {
+    const resultEl = document.getElementById(`${prefix}AssetSearchResults`);
+    if (!resultEl) return;
+
+    if (!assets.length) {
+        resultEl.innerHTML = `<div class="asset-search-empty">No matching assets for "${escapeHtml(query)}"</div>`;
+        resultEl.style.display = 'block';
+        return;
+    }
+
+    resultEl.innerHTML = assets.map((asset, idx) => {
+        const code = asset.asset_type === 'stock'
+            ? `${asset.symbol || ''} ${asset.exchange || ''}`.trim()
+            : `Code: ${asset.scheme_code || '-'}`;
+        return `
+            <div class="asset-search-item" data-index="${idx}">
+                <strong>${escapeHtml(asset.holding_name || asset.display_name)}</strong>
+                <span class="asset-search-meta">${escapeHtml(asset.display_name)} • ${escapeHtml(code)}</span>
+            </div>
+        `;
+    }).join('');
+    resultEl.style.display = 'block';
+
+    const items = resultEl.querySelectorAll('.asset-search-item');
+    items.forEach(item => {
+        item.addEventListener('click', () => {
+            const idx = parseInt(item.dataset.index, 10);
+            const selected = assets[idx];
+            if (!selected) return;
+
+            document.getElementById(`${prefix}Holding`).value = selected.holding_name || selected.display_name || '';
+            document.getElementById(`${prefix}AssetType`).value = selected.asset_type || '';
+            document.getElementById(`${prefix}AssetSymbol`).value = selected.symbol || '';
+            document.getElementById(`${prefix}AssetExchange`).value = selected.exchange || '';
+            document.getElementById(`${prefix}AssetSchemeCode`).value = selected.scheme_code || '';
+            document.getElementById(`${prefix}AssetSearch`).value = selected.display_name || selected.holding_name || '';
+            document.getElementById(`${prefix}UnitPrice`).value = '';
+            document.getElementById(`${prefix}UnitPriceInfo`).textContent = 'Asset selected. Click Fetch 1 Unit Price.';
+            document.getElementById(`${prefix}Units`).value = '';
+
+            resultEl.style.display = 'none';
+            resultEl.innerHTML = '';
+        });
+    });
+}
+
+function setupInvestmentAssetSearch(prefix) {
+    const searchInput = document.getElementById(`${prefix}AssetSearch`);
+    const resultEl = document.getElementById(`${prefix}AssetSearchResults`);
+    if (!searchInput || !resultEl) return;
+
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (assetSearchDebounce[prefix]) {
+            clearTimeout(assetSearchDebounce[prefix]);
+        }
+
+        document.getElementById(`${prefix}Holding`).value = '';
+        document.getElementById(`${prefix}AssetType`).value = '';
+        document.getElementById(`${prefix}AssetSymbol`).value = '';
+        document.getElementById(`${prefix}AssetExchange`).value = '';
+        document.getElementById(`${prefix}AssetSchemeCode`).value = '';
+        document.getElementById(`${prefix}UnitPrice`).value = '';
+        document.getElementById(`${prefix}UnitPriceInfo`).textContent = 'Unit price will appear here after fetch.';
+        document.getElementById(`${prefix}Units`).value = '';
+
+        if (query.length < 2) {
+            resultEl.innerHTML = '';
+            resultEl.style.display = 'none';
+            return;
+        }
+
+        resultEl.innerHTML = '<div class="asset-search-empty">Searching assets...</div>';
+        resultEl.style.display = 'block';
+
+        assetSearchDebounce[prefix] = setTimeout(async () => {
+            try {
+                const response = await fetch(`${API_BASE}/assets/search?q=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    throw new Error('Search failed');
+                }
+                const assets = await response.json();
+                renderAssetSearchResults(prefix, assets, query);
+            } catch (error) {
+                resultEl.innerHTML = '<div class="asset-search-empty">Unable to search right now.</div>';
+                resultEl.style.display = 'block';
+            }
+        }, 350);
+    });
+}
+
+async function fetchHistoricalUnitPrice(prefix) {
+    const date = document.getElementById(`${prefix}Date`).value;
+    const assetType = document.getElementById(`${prefix}AssetType`).value;
+    const symbol = document.getElementById(`${prefix}AssetSymbol`).value;
+    const exchange = document.getElementById(`${prefix}AssetExchange`).value;
+    const schemeCode = document.getElementById(`${prefix}AssetSchemeCode`).value;
+    const unitInfoEl = document.getElementById(`${prefix}UnitPriceInfo`);
+    const unitPriceEl = document.getElementById(`${prefix}UnitPrice`);
+
+    if (!date) {
+        showError('Please select the investment date first.');
+        return;
+    }
+
+    if (!assetType) {
+        showError('Please search and select a stock or mutual fund first.');
+        return;
+    }
+
+    unitInfoEl.textContent = 'Fetching 1 unit price...';
+
+    const params = new URLSearchParams({
+        asset_type: assetType,
+        target_date: date,
+    });
+
+    if (assetType === 'stock') {
+        params.set('symbol', symbol);
+        params.set('exchange', exchange || 'NSE');
+    } else {
+        params.set('scheme_code', schemeCode);
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/assets/historical-price?${params.toString()}`);
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Unable to fetch historical price');
+        }
+
+        const data = await response.json();
+        unitPriceEl.value = String(data.unit_price);
+
+        const fallbackText = data.is_fallback
+            ? ` (fallback from ${data.requested_date} to ${data.price_date})`
+            : '';
+        unitInfoEl.textContent = `1 unit = ${formatCurrency(data.unit_price)} as of ${data.price_date}${fallbackText}`;
+
+        updateAmountFromUnits(prefix);
+    } catch (error) {
+        unitPriceEl.value = '';
+        unitInfoEl.textContent = 'Could not fetch unit price.';
+        showError(error.message);
+    }
+}
+
+function updateAmountFromUnits(prefix) {
+    const units = parseFloat(document.getElementById(`${prefix}Units`).value) || 0;
+    const unitPrice = parseFloat(document.getElementById(`${prefix}UnitPrice`).value) || 0;
+    const amountEl = document.getElementById(`${prefix}Amount`);
+
+    if (units > 0 && unitPrice > 0) {
+        amountEl.value = (units * unitPrice).toFixed(2);
+        if (prefix === 'invest') {
+            updateInvestRemaining();
+        }
+    }
 }
 
 // ============================================
@@ -1181,7 +1940,7 @@ function openInvestModal(brokerId, brokerName, brokerDate, idleAmount) {
     document.getElementById('investAvailable').textContent = formatCurrency(idleAmount);
     document.getElementById('investMaxAmount').value = idleAmount;
     document.getElementById('investDate').value = getTodayDate();
-    document.getElementById('investAmount').value = '';
+    resetInvestmentPricingUi('invest', true);
     document.getElementById('investRemaining').textContent = formatCurrency(idleAmount);
     openModal('invest');
 }
@@ -1200,6 +1959,7 @@ function openInvestmentModal() {
     document.getElementById('investmentModalTitle').textContent = '📈 New Investment';
     document.getElementById('investmentEditId').value = '';
     document.getElementById('investmentDate').value = getTodayDate();
+    resetInvestmentPricingUi('investment', true);
     openModal('investment');
 }
 
@@ -1214,6 +1974,10 @@ function openEditInvestmentModal(id) {
             document.getElementById('investmentDate').value = data.date;
             document.getElementById('investmentHolding').value = data.holding_name;
             document.getElementById('investmentAmount').value = data.amount;
+            document.getElementById('investmentAssetSearch').value = data.holding_name;
+            document.getElementById('investmentUnitPrice').value = '';
+            document.getElementById('investmentUnits').value = '';
+            document.getElementById('investmentUnitPriceInfo').textContent = 'Re-select asset and click Fetch if you want unit-based recalculation.';
             document.getElementById('investmentNotes').value = data.notes || '';
             openModal('investment');
         })
@@ -1473,10 +2237,844 @@ function toggleBreakdown() {
     }
 }
 
+function toggleSIPs() {
+    const content = document.getElementById('sipsContent');
+    const arrow = document.getElementById('sipsArrow');
+
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+    } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+    }
+}
+
+function openSIPModal() {
+    document.getElementById('sipModalTitle').textContent = '🔁 New SIP';
+    document.getElementById('sipEditId').value = '';
+    document.getElementById('sipForm').reset();
+    document.getElementById('sipFrequency').value = 'monthly';
+    toggleSIPFrequencyFields();
+    openModal('sip');
+}
+
+async function openEditSIPModal(sipId, brokerName, holdingName, frequency, weekday, monthlyDay, executionDates, amount, notes) {
+    document.getElementById('sipModalTitle').textContent = '🔁 Edit SIP';
+    document.getElementById('sipEditId').value = sipId;
+    document.getElementById('sipBroker').value = brokerName;
+    document.getElementById('sipHolding').value = holdingName;
+    document.getElementById('sipFrequency').value = frequency;
+    document.getElementById('sipAmount').value = amount;
+    document.getElementById('sipForm').notes = notes || '';
+    
+    // Clear all checkboxes first
+    document.querySelectorAll('.sip-date-check').forEach(cb => cb.checked = false);
+    
+    if (frequency === 'weekly') {
+        document.getElementById('sipWeekday').value = weekday;
+    } else if (frequency === 'Particular Dates') {
+        // Populate execution dates checkboxes
+        if (executionDates) {
+            const datesArray = executionDates.split(',').map(d => d.trim());
+            datesArray.forEach(date => {
+                const checkbox = document.querySelector(`.sip-date-check[value="${date}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
+        }
+    } else {
+        // monthly
+        document.getElementById('sipMonthlyDay').value = monthlyDay || '5';
+    }
+    
+    toggleSIPFrequencyFields();
+    openModal('sip');
+}
+
+function openEditSIPFromButton(button) {
+    const sipId = parseInt(button.dataset.sipId);
+    const brokerName = button.dataset.brokerName;
+    const holdingName = button.dataset.holdingName;
+    const frequency = button.dataset.frequency;
+    const weekday = button.dataset.weekday || '';
+    const monthlyDay = button.dataset.monthlyDay || '';
+    const executionDates = button.dataset.executionDates || '';
+    const amount = parseFloat(button.dataset.amount);
+    const notes = button.dataset.notes || '';
+    
+    openEditSIPModal(sipId, brokerName, holdingName, frequency, weekday, monthlyDay, executionDates, amount, notes);
+}
+
+function toggleSIPFrequencyFields() {
+    const frequency = document.getElementById('sipFrequency').value;
+    const weeklyGroup = document.getElementById('sipWeekdayGroup');
+    const monthlyGroup = document.getElementById('sipMonthlyDayGroup');
+    const datesGroup = document.getElementById('sipExecutionDatesGroup');
+
+    if (frequency === 'weekly') {
+        weeklyGroup.style.display = 'block';
+        monthlyGroup.style.display = 'none';
+        datesGroup.style.display = 'none';
+    } else if (frequency === 'Particular Dates') {
+        weeklyGroup.style.display = 'none';
+        monthlyGroup.style.display = 'none';
+        datesGroup.style.display = 'block';
+    } else {
+        weeklyGroup.style.display = 'none';
+        monthlyGroup.style.display = 'block';
+        datesGroup.style.display = 'none';
+    }
+}
+
+async function saveSIP(event) {
+    event.preventDefault();
+
+    const sipId = document.getElementById('sipEditId').value;
+    const frequency = document.getElementById('sipFrequency').value;
+    const payload = {
+        broker_name: document.getElementById('sipBroker').value,
+        holding_name: document.getElementById('sipHolding').value,
+        frequency: frequency,
+        amount: parseFloat(document.getElementById('sipAmount').value),
+    };
+
+    if (frequency === 'weekly') {
+        payload.weekday = document.getElementById('sipWeekday').value;
+    } else if (frequency === 'Particular Dates') {
+        // Collect selected execution dates from checkboxes
+        const checked = Array.from(document.querySelectorAll('.sip-date-check:checked'))
+            .map(cb => cb.value)
+            .sort((a, b) => parseInt(a) - parseInt(b));
+        if (checked.length === 0) {
+            showError('Please select at least one date for Particular Dates mode.');
+            return;
+        }
+        payload.execution_dates = checked.join(',');
+    } else {
+        // monthly
+        payload.monthly_day = parseInt(document.getElementById('sipMonthlyDay').value);
+    }
+
+    try {
+        const url = sipId ? `${API_BASE}/sips/${sipId}` : `${API_BASE}/sips`;
+        const method = sipId ? 'PUT' : 'POST';
+        
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to save SIP');
+        }
+
+        closeModal('sip');
+        location.reload();
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+async function deleteSIP(sipId) {
+    if (!confirm('Delete this SIP? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/sips/${sipId}`, {
+            method: 'DELETE'
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to delete SIP');
+        }
+
+        showSuccess('SIP deleted successfully');
+        location.reload();
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+function deleteSIPFromButton(button) {
+    const sipId = parseInt(button.dataset.sipId);
+    deleteSIP(sipId);
+}
+
+async function openRunSIPModalFromButton(button) {
+    const presetMonth = button.dataset.brokerMonth || new Date().toISOString().slice(0, 7);
+    const presetCreditId = parseInt(button.dataset.brokerId);
+    await openRunZerodhaSIPModal(presetMonth, presetCreditId);
+}
+
+async function openRunCoinSIPModal() {
+    document.getElementById('runSIPMode').value = 'coin';
+    document.getElementById('runSIPBrokerCreditId').value = '';
+    document.getElementById('runSIPBrokerName').value = 'Coin';
+    document.getElementById('runSIPBroker').textContent = 'Coin';
+    document.getElementById('runSIPIdle').textContent = 'Selected Month\'s amt will be used!';
+    document.getElementById('runSIPMonth').value = new Date().toISOString().slice(0, 7);
+    document.getElementById('runSIPBankTransferGroup').style.display = 'block';
+    document.getElementById('runSIPBrokerCreditGroup').style.display = 'none';
+    document.getElementById('runSIPExecutionDatesGroup').style.display = 'none';  // Hide for Coin aggregation
+    document.getElementById('dueSIPPreview').textContent = 'Loading due SIPs...';
+    openModal('runSIP');
+    await loadMonthBankTransfers();
+    loadCoinDueSIPsPreview();  // Load aggregated preview for Coin
+}
+
+async function openRunZerodhaSIPModal(presetMonth = null, presetCreditId = null) {
+    document.getElementById('runSIPMode').value = 'zerodha';
+    document.getElementById('runSIPBrokerCreditId').value = '';
+    document.getElementById('runSIPBrokerName').value = 'Zerodha';
+    document.getElementById('runSIPBroker').textContent = 'Zerodha';
+    document.getElementById('runSIPIdle').textContent = 'Selected Broker Credit\'s idle will be used!';
+    document.getElementById('runSIPMonth').value = presetMonth || new Date().toISOString().slice(0, 7);
+    document.getElementById('runSIPBankTransferGroup').style.display = 'none';
+    document.getElementById('runSIPBrokerCreditGroup').style.display = 'block';
+    document.getElementById('runSIPExecutionDatesGroup').style.display = 'none';  // Hide for Zerodha aggregation
+    document.getElementById('dueSIPPreview').textContent = 'Loading due SIPs...';
+    openModal('runSIP');
+    await loadMonthBrokerCredits(presetCreditId);
+    loadZerodhaDueSIPsPreview();  // Load aggregated preview for Zerodha
+}
+
+async function loadMonthBankTransfers() {
+    const month = document.getElementById('runSIPMonth').value;
+    const select = document.getElementById('runSIPBankTransfer');
+    if (!month) {
+        return false;
+    }
+
+    select.innerHTML = '<option value="">Loading...</option>';
+    try {
+        const res = await fetch(`${API_BASE}/bank-transfers?with_idle_only=true&month=${encodeURIComponent(month)}`);
+        if (!res.ok) {
+            throw new Error('Failed to load month bank transfers');
+        }
+        const transfers = await res.json();
+        if (!transfers.length) {
+            select.innerHTML = '<option value="">No Idle Amt left for selected month</option>';
+            return false;
+        }
+
+        select.innerHTML = transfers.map(t =>
+            `<option value="${t.id}">${t.source_bank} - ${t.date} (Available ${formatCurrency(t.idle_amount)})</option>`
+        ).join('');
+        select.value = String(transfers[0].id);
+        return true;
+    } catch (err) {
+        select.innerHTML = '<option value="">Unable to load bank transfers</option>';
+        return false;
+    }
+}
+
+async function loadMonthBrokerCredits(preselectedCreditId = null) {
+    const month = document.getElementById('runSIPMonth').value;
+    const select = document.getElementById('runSIPBrokerCredit');
+    if (!month) {
+        return false;
+    }
+
+    select.innerHTML = '<option value="">Loading...</option>';
+    try {
+        const res = await fetch(`${API_BASE}/broker-credits?with_idle_only=true&month=${encodeURIComponent(month)}&broker=zerodha`);
+        if (!res.ok) {
+            throw new Error('Failed to load month broker credits');
+        }
+        const credits = await res.json();
+        if (!credits.length) {
+            select.innerHTML = '<option value="">No Idle Amt in Zerodha credits for selected month</option>';
+            return false;
+        }
+
+        select.innerHTML = credits.map(c =>
+            `<option value="${c.id}">${c.date} - Available ${formatCurrency(c.idle_amount)}</option>`
+        ).join('');
+        const preferred = preselectedCreditId ? credits.find(c => c.id === preselectedCreditId) : null;
+        select.value = String(preferred ? preferred.id : credits[0].id);
+        return true;
+    } catch (err) {
+        select.innerHTML = '<option value="">Unable to load broker credits</option>';
+        return false;
+    }
+}
+
+async function onRunSIPMonthChange() {
+    const mode = document.getElementById('runSIPMode').value;
+    if (mode === 'coin') {
+        await loadMonthBankTransfers();
+        loadCoinDueSIPsPreview();  // Load Coin preview after month change
+    } else if (mode === 'zerodha') {
+        await loadMonthBrokerCredits();
+        loadZerodhaDueSIPsPreview();  // Load Zerodha preview after month change
+    } else {
+        populateRunSIPExecutionDates();
+    }
+}
+
+function onRunSIPDateSelectChange() {
+    const selected = document.getElementById('runSIPDateSelect').value;
+    document.getElementById('runSIPDate').value = selected || '';
+    loadDueSIPsPreview();
+}
+
+function onRunSIPBankTransferChange() {
+    const mode = document.getElementById('runSIPMode').value;
+    if (mode === 'coin') {
+        loadCoinDueSIPsPreview();
+    } else {
+        loadDueSIPsPreview();
+    }
+}
+
+function onRunSIPBrokerCreditChange() {
+    const mode = document.getElementById('runSIPMode').value;
+    if (mode === 'zerodha') {
+        loadZerodhaDueSIPsPreview();
+    }
+}
+
+async function populateRunSIPExecutionDates() {
+    const broker = document.getElementById('runSIPBrokerName').value;
+    const month = document.getElementById('runSIPMonth').value;
+    const dateSelect = document.getElementById('runSIPDateSelect');
+    const hiddenDate = document.getElementById('runSIPDate');
+    const hiddenDates = document.getElementById('runSIPExecutionDates');
+
+    if (!broker || !month) {
+        setRunSIPSubmitState(false, 'Choose broker and month to evaluate due SIPs.');
+        return;
+    }
+
+    dateSelect.innerHTML = '<option value="">Loading...</option>';
+    hiddenDate.value = '';
+    hiddenDates.value = '';
+    setRunSIPSubmitState(false, 'Loading SIP schedule for selected month...');
+
+    try {
+        const res = await fetch(`${API_BASE}/sips?broker_name=${encodeURIComponent(broker)}&active_only=true`);
+        if (!res.ok) {
+            throw new Error('Failed to load SIP definitions');
+        }
+        const sips = await res.json();
+        if (!sips.length) {
+            dateSelect.innerHTML = '<option value="">No active SIPs for selected broker</option>';
+            document.getElementById('dueSIPPreview').textContent = 'No active SIPs for selected broker.';
+            setRunSIPSubmitState(false, 'No active SIPs found for this broker.');
+            return;
+        }
+
+        const [y, m] = month.split('-').map(Number);
+        const daysInMonth = new Date(y, m, 0).getDate();
+        const dates = new Set();
+
+        sips.forEach(sip => {
+            if (sip.frequency === 'monthly' && sip.monthly_day) {
+                if (sip.monthly_day <= daysInMonth) {
+                    dates.add(formatDateYMD(new Date(y, m - 1, sip.monthly_day)));
+                }
+            }
+            if (sip.frequency === 'weekly' && sip.weekday) {
+                const targetDow = weekdayIndex(sip.weekday);
+                if (targetDow !== undefined) {
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const d = new Date(y, m - 1, day);
+                        if (d.getDay() === targetDow) {
+                            dates.add(formatDateYMD(d));
+                        }
+                    }
+                }
+            }
+        });
+
+        const sorted = Array.from(dates).sort();
+        if (!sorted.length) {
+            dateSelect.innerHTML = '<option value="">No valid execution dates for this month</option>';
+            document.getElementById('dueSIPPreview').textContent = 'No valid execution dates for this month.';
+            setRunSIPSubmitState(false, 'No valid execution dates for selected month.');
+            return;
+        }
+
+        dateSelect.innerHTML = sorted.map(d => `<option value="${d}">${d}</option>`).join('');
+        const today = getTodayDate();
+        const defaultDate = sorted.includes(today) ? today : sorted[0];
+        dateSelect.value = defaultDate;
+        hiddenDate.value = defaultDate;
+        hiddenDates.value = sorted.join(',');
+        loadDueSIPsPreview();
+    } catch (err) {
+        dateSelect.innerHTML = '<option value="">Unable to load dates</option>';
+        hiddenDates.value = '';
+        document.getElementById('dueSIPPreview').textContent = 'Unable to generate dates from SIP frequency.';
+        setRunSIPSubmitState(false, 'Unable to generate SIP schedule for selected month.');
+    }
+}
+
+async function loadCoinDueSIPsPreview() {
+    const month = document.getElementById('runSIPMonth').value;
+    const bankTransferId = parseInt(document.getElementById('runSIPBankTransfer').value);
+    const preview = document.getElementById('dueSIPPreview');
+    
+    if (!month || !bankTransferId) {
+        preview.textContent = 'No bank transfer with idle balance is available for the selected month.';
+        setRunSIPSubmitState(false, 'No bank transfer with idle balance is available for this month.');
+        return;
+    }
+
+    try {
+        // Fetch all active Coin SIPs
+        const res = await fetch(`${API_BASE}/sips?broker_name=Coin&active_only=true`);
+        if (!res.ok) {
+            throw new Error('Failed to load active SIPs');
+        }
+        const sips = await res.json();
+
+        if (!sips.length) {
+            preview.textContent = 'No active Coin SIPs configured.';
+            setRunSIPSubmitState(false, 'No active Coin SIPs to execute.');
+            return;
+        }
+
+        // Calculate due SIPs for each execution date in the month.
+        const [y, m] = month.split('-').map(Number);
+        const daysInMonth = new Date(y, m, 0).getDate();
+        const scheduleByDate = new Map();
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const executionDate = new Date(y, m - 1, day);
+            const adjustedDate = adjustForWeekend(executionDate);
+            const adjustedDateText = formatDateYMD(adjustedDate);
+            const dueForDate = [];
+
+            sips.forEach(sip => {
+                const lastExecuted = sip.last_executed_on ? new Date(`${sip.last_executed_on}T00:00:00`) : null;
+
+                if (sip.frequency === 'monthly' && sip.monthly_day) {
+                    const alreadyExecutedThisMonth = lastExecuted
+                        && lastExecuted.getFullYear() === executionDate.getFullYear()
+                        && lastExecuted.getMonth() === executionDate.getMonth();
+
+                    if (adjustedDate.getDate() === sip.monthly_day && !alreadyExecutedThisMonth) {
+                        dueForDate.push(sip);
+                    }
+                    return;
+                }
+
+                if (sip.frequency === 'weekly' && sip.weekday) {
+                    const targetDow = weekdayIndex(sip.weekday);
+                    const alreadyExecutedThisDate = lastExecuted
+                        && formatDateYMD(lastExecuted) === adjustedDateText;
+
+                    if (targetDow !== undefined && adjustedDate.getDay() === targetDow && !alreadyExecutedThisDate) {
+                        dueForDate.push(sip);
+                    }
+                    return;
+                }
+
+                if (sip.frequency === 'Particular Dates' && sip.execution_dates) {
+                    const dates = sip.execution_dates
+                        .split(',')
+                        .map(d => parseInt(d.trim(), 10))
+                        .filter(n => Number.isInteger(n));
+                    const alreadyExecutedThisMonth = lastExecuted
+                        && lastExecuted.getFullYear() === executionDate.getFullYear()
+                        && lastExecuted.getMonth() === executionDate.getMonth();
+
+                    if (dates.includes(adjustedDate.getDate()) && !alreadyExecutedThisMonth) {
+                        dueForDate.push(sip);
+                    }
+                }
+            });
+
+            if (dueForDate.length) {
+                scheduleByDate.set(adjustedDateText, dueForDate);
+            }
+        }
+
+        const dueCount = Array.from(scheduleByDate.values()).reduce((total, dueForDate) => total + dueForDate.length, 0);
+
+        if (dueCount === 0) {
+            preview.innerHTML = '<strong style="color: #666;">✓ All active Coin SIPs were executed already for ' + month + '.</strong>' +
+                                '<p style="font-size: 0.9em; color: #999; margin-top: 8px;">Delete the broker credit if you want to re-run these SIPs.</p>';
+            setRunSIPSubmitState(false, 'All active SIPs already executed for this month.');
+            return;
+        }
+
+        const chunks = [];
+        scheduleByDate.forEach((dueForDate, executionDateText) => {
+            chunks.push(`
+                <div class="due-sip-date"><strong>${executionDateText}</strong></div>
+                ${dueForDate.map(sip => `
+                    <div class="due-sip-item">
+                        <span class="due-sip-name">${sip.holding_name} <small style="color: #666;">(${sip.frequency})</small></span>
+                        <strong class="due-sip-amount">${formatCurrency(sip.amount)}</strong>
+                    </div>
+                `).join('')}
+            `);
+        });
+
+        preview.innerHTML = `<strong style="margin-bottom: 8px; display: block;">Due SIPs for ${month}:</strong>${chunks.join('')}`;
+        setRunSIPSubmitState(dueCount > 0);
+    } catch (err) {
+        preview.textContent = 'Unable to load due SIPs: ' + err.message;
+        setRunSIPSubmitState(false, 'Unable to verify Coin SIPs.');
+    }
+}
+
+async function loadZerodhaDueSIPsPreview() {
+    const month = document.getElementById('runSIPMonth').value;
+    const brokerCreditId = parseInt(document.getElementById('runSIPBrokerCredit').value);
+    const preview = document.getElementById('dueSIPPreview');
+    
+    if (!month || !brokerCreditId) {
+        preview.textContent = 'No broker credit with idle balance is available for the selected month.';
+        setRunSIPSubmitState(false, 'No broker credit with idle balance is available for this month.');
+        return;
+    }
+
+    try {
+        // Fetch all active Zerodha SIPs
+        const res = await fetch(`${API_BASE}/sips?broker_name=Zerodha&active_only=true`);
+        if (!res.ok) {
+            throw new Error('Failed to load active SIPs');
+        }
+        const sips = await res.json();
+
+        if (!sips.length) {
+            preview.textContent = 'No active Zerodha SIPs configured.';
+            setRunSIPSubmitState(false, 'No active Zerodha SIPs to execute.');
+            return;
+        }
+
+        // Calculate due SIPs for each execution date in the month.
+        const [y, m] = month.split('-').map(Number);
+        const daysInMonth = new Date(y, m, 0).getDate();
+        const scheduleByDate = new Map();
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const executionDate = new Date(y, m - 1, day);
+            const adjustedDate = adjustForWeekend(executionDate);
+            const adjustedDateText = formatDateYMD(adjustedDate);
+            const dueForDate = [];
+
+            sips.forEach(sip => {
+                const lastExecuted = sip.last_executed_on ? new Date(`${sip.last_executed_on}T00:00:00`) : null;
+
+                if (sip.frequency === 'monthly' && sip.monthly_day) {
+                    const alreadyExecutedThisMonth = lastExecuted
+                        && lastExecuted.getFullYear() === executionDate.getFullYear()
+                        && lastExecuted.getMonth() === executionDate.getMonth();
+
+                    if (adjustedDate.getDate() === sip.monthly_day && !alreadyExecutedThisMonth) {
+                        dueForDate.push(sip);
+                    }
+                    return;
+                }
+
+                if (sip.frequency === 'weekly' && sip.weekday) {
+                    const targetDow = weekdayIndex(sip.weekday);
+                    const alreadyExecutedThisDate = lastExecuted
+                        && formatDateYMD(lastExecuted) === adjustedDateText;
+
+                    if (targetDow !== undefined && adjustedDate.getDay() === targetDow && !alreadyExecutedThisDate) {
+                        dueForDate.push(sip);
+                    }
+                    return;
+                }
+
+                if (sip.frequency === 'Particular Dates' && sip.execution_dates) {
+                    const dates = sip.execution_dates
+                        .split(',')
+                        .map(d => parseInt(d.trim(), 10))
+                        .filter(n => Number.isInteger(n));
+                    const alreadyExecutedThisMonth = lastExecuted
+                        && lastExecuted.getFullYear() === executionDate.getFullYear()
+                        && lastExecuted.getMonth() === executionDate.getMonth();
+
+                    if (dates.includes(adjustedDate.getDate()) && !alreadyExecutedThisMonth) {
+                        dueForDate.push(sip);
+                    }
+                }
+            });
+
+            if (dueForDate.length) {
+                scheduleByDate.set(adjustedDateText, dueForDate);
+            }
+        }
+
+        const dueCount = Array.from(scheduleByDate.values()).reduce((total, dueForDate) => total + dueForDate.length, 0);
+
+        if (dueCount === 0) {
+            preview.innerHTML = '<strong style="color: #666;">✓ All active Zerodha SIPs were executed already for ' + month + '.</strong>' +
+                                '<p style="font-size: 0.9em; color: #999; margin-top: 8px;">Delete the broker credit if you want to re-run these SIPs.</p>';
+            setRunSIPSubmitState(false, 'All active SIPs already executed for this month.');
+            return;
+        }
+
+        const chunks = [];
+        scheduleByDate.forEach((dueForDate, executionDateText) => {
+            chunks.push(`
+                <div class="due-sip-date"><strong>${executionDateText}</strong></div>
+                ${dueForDate.map(sip => `
+                    <div class="due-sip-item">
+                        <span class="due-sip-name">${sip.holding_name} <small style="color: #666;">(${sip.frequency}${sip.frequency === 'Particular Dates' && sip.execution_dates ? ' - ' + sip.execution_dates : ''})</small></span>
+                        <strong class="due-sip-amount">${formatCurrency(sip.amount)}</strong>
+                    </div>
+                `).join('')}
+            `);
+        });
+
+        preview.innerHTML = `<strong style="margin-bottom: 8px; display: block;">Due SIPs for ${month}:</strong>${chunks.join('')}`;
+        setRunSIPSubmitState(dueCount > 0);
+    } catch (err) {
+        preview.textContent = 'Unable to load due SIPs: ' + err.message;
+        setRunSIPSubmitState(false, 'Unable to verify Zerodha SIPs.');
+    }
+}
+
+async function loadDueSIPsPreview() {
+    const broker = document.getElementById('runSIPBrokerName').value;
+    const executionDates = (document.getElementById('runSIPExecutionDates').value || '')
+        .split(',')
+        .map(d => d.trim())
+        .filter(Boolean);
+    if (!broker || !executionDates.length) {
+        setRunSIPSubmitState(false, 'No valid execution dates generated for selected month.');
+        return;
+    }
+
+    try {
+        const preview = document.getElementById('dueSIPPreview');
+        const chunks = [];
+        let dueCount = 0;
+
+        for (const executionDate of executionDates) {
+            const res = await fetch(`${API_BASE}/sips/due?broker_name=${encodeURIComponent(broker)}&execution_date=${executionDate}`);
+            if (!res.ok) {
+                throw new Error('Failed to load due SIPs');
+            }
+            const due = await res.json();
+            if (!due.length) {
+                continue;
+            }
+
+            dueCount += due.length;
+
+            chunks.push(`
+                <div class="due-sip-date"><strong>${executionDate}</strong></div>
+                ${due.map(sip => `
+                    <div class="due-sip-item">
+                        <span>${sip.holding_name}</span>
+                        <strong>${formatCurrency(sip.amount)}</strong>
+                    </div>
+                `).join('')}
+            `);
+        }
+
+        if (!chunks.length) {
+            preview.textContent = 'No due SIPs for selected month.';
+            setRunSIPSubmitState(false, 'Duplicate or already executed SIP allocations detected for selected month. Run is blocked to prevent duplicate transactions.');
+            return;
+        }
+
+        preview.innerHTML = chunks.join('');
+
+        const mode = document.getElementById('runSIPMode').value;
+        if (mode === 'coin') {
+            const bankTransferId = parseInt(document.getElementById('runSIPBankTransfer').value);
+            if (!bankTransferId) {
+                setRunSIPSubmitState(false, 'Select a valid bank transfer for this month.');
+                return;
+            }
+        }
+
+        setRunSIPSubmitState(dueCount > 0);
+    } catch (err) {
+        document.getElementById('dueSIPPreview').textContent = 'Unable to load due SIPs';
+        setRunSIPSubmitState(false, 'Unable to verify duplicate SIP allocations right now.');
+    }
+}
+
+async function runDueSIPs(event) {
+    event.preventDefault();
+
+    const mode = document.getElementById('runSIPMode').value;
+    
+    try {
+        if (mode === 'coin') {
+            // For Coin: single aggregated call for the entire month
+            const payload = {
+                bank_transfer_id: parseInt(document.getElementById('runSIPBankTransfer').value),
+                sip_month: document.getElementById('runSIPMonth').value,
+            };
+            if (!payload.bank_transfer_id) {
+                showError('Please select a valid bank transfer for the selected month.');
+                setRunSIPSubmitState(false, 'Select a valid bank transfer for this month.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/sips/run-coin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                if (res.status === 409) {
+                    // Duplicate/already executed
+                    showError('⚠️ ' + (err.detail || 'All active Coin SIPs were already executed for this month. Delete the broker credit if you want to re-run them.'));
+                } else {
+                    showError(err.detail || 'Failed to run Coin SIPs');
+                }
+                return;
+            }
+
+            const data = await res.json();
+            alert(`Allocated ${data.allocated_count} fund(s) totaling ${formatCurrency(data.total_allocated)} for the month.`);
+            closeModal('runSIP');
+            location.reload();
+        } else if (mode === 'zerodha') {
+            // For Zerodha: single aggregated call for the entire month
+            const payload = {
+                broker_credit_id: parseInt(document.getElementById('runSIPBrokerCredit').value),
+                sip_month: document.getElementById('runSIPMonth').value,
+            };
+            if (!payload.broker_credit_id) {
+                showError('Please select a valid broker credit for the selected month.');
+                setRunSIPSubmitState(false, 'Select a valid broker credit for this month.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/sips/run-zerodha`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                if (res.status === 409) {
+                    // Duplicate/already executed
+                    showError('⚠️ ' + (err.detail || 'All active Zerodha SIPs were already executed for this broker credit. Delete the investments if you want to re-run them.'));
+                } else {
+                    showError(err.detail || 'Failed to run Zerodha SIPs');
+                }
+                return;
+            }
+
+            const data = await res.json();
+            alert(`Allocated ${data.allocated_count} fund(s) totaling ${formatCurrency(data.total_allocated)} for the month.`);
+            closeModal('runSIP');
+            location.reload();
+        } else {
+            // For per-date Zerodha: keep date-by-date loop (legacy mode for old per-date execution)
+            const executionDates = (document.getElementById('runSIPExecutionDates').value || '')
+                .split(',')
+                .map(d => d.trim())
+                .filter(Boolean);
+            if (!executionDates.length) {
+                showError('No valid execution dates generated for the selected month.');
+                return;
+            }
+
+            const payload = {
+                broker_credit_id: parseInt(document.getElementById('runSIPBrokerCreditId').value),
+            };
+
+            let totalAllocated = 0;
+            let allocatedCount = 0;
+
+            for (const executionDate of executionDates) {
+                const res = await fetch(`${API_BASE}/sips/run`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...payload,
+                        execution_date: executionDate,
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(`${executionDate}: ${err.detail || 'Failed to run SIPs'}`);
+                }
+
+                const data = await res.json();
+                totalAllocated += data.total_allocated;
+                allocatedCount += data.allocated_count;
+            }
+
+            alert(`Executed ${executionDates.length} date(s). Allocated ${allocatedCount} SIP(s) totaling ${formatCurrency(totalAllocated)}.`);
+            closeModal('runSIP');
+            location.reload();
+        }
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
 // ============================================
 // Card Hover Highlighting
 // ============================================
+function parseSIPNotes(notes) {
+    // Parse notes like: "Coin SIP allocation (monthly) - Dates: 2026-04-02, 2026-04-09, ..."
+    if (!notes) return { frequency: '', dates: [] };
+    
+    const freqMatch = notes.match(/\((\w+)\)/);
+    const frequency = freqMatch ? freqMatch[1] : '';
+    
+    const datesMatch = notes.match(/Dates:\s*([\d\-,\s]+)/);
+    const datesStr = datesMatch ? datesMatch[1].trim() : '';
+    const dates = datesStr.split(',').map(d => d.trim()).filter(Boolean);
+    
+    return { frequency, dates };
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    setupInvestmentAssetSearch('invest');
+    setupInvestmentAssetSearch('investment');
+
+    document.addEventListener('click', function(e) {
+        const investSearch = document.getElementById('investAssetSearch');
+        const investResults = document.getElementById('investAssetSearchResults');
+        const directSearch = document.getElementById('investmentAssetSearch');
+        const directResults = document.getElementById('investmentAssetSearchResults');
+
+        if (investSearch && investResults && !investSearch.contains(e.target) && !investResults.contains(e.target)) {
+            investResults.style.display = 'none';
+        }
+        if (directSearch && directResults && !directSearch.contains(e.target) && !directResults.contains(e.target)) {
+            directResults.style.display = 'none';
+        }
+    });
+
+    // Parse SIP notes and display frequency + dates
+    document.querySelectorAll('.card-notes[data-notes]').forEach(notesDiv => {
+        const notes = notesDiv.dataset.notes;
+        const parsed = parseSIPNotes(notes);
+        
+        const freqDisplay = notesDiv.querySelector('.sip-frequency-display');
+        const datesDisplay = notesDiv.querySelector('.sip-dates-display');
+        
+        if (freqDisplay && parsed.frequency) {
+            freqDisplay.textContent = `${parsed.frequency.charAt(0).toUpperCase() + parsed.frequency.slice(1)} SIP`;
+        }
+        
+        if (datesDisplay && parsed.dates.length) {
+            const datesText = parsed.dates.map(d => {
+                const dateObj = new Date(d + 'T00:00:00');
+                return dateObj.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+            }).join(', ');
+            datesDisplay.textContent = datesText;
+            datesDisplay.style.display = 'block';
+        }
+    });
+
     const cards = document.querySelectorAll('.flow-card');
     
     cards.forEach(card => {
