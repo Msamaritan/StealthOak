@@ -76,7 +76,7 @@ class PortfolioStats:
         stock_symbols_with_exchange = [
             (h.symbol, h.exchange or "NSE") for h in stocks
         ]
-        mf_codes = [h.symbol for h in mfs]  # symbol stores scheme_code for MF
+        mf_codes = [h.symbol for h in mfs if str(h.symbol).isdigit()]  # symbol stores numeric scheme_code for MF
         
         stock_prices = await price_fetcher.get_multiple_stock_prices(stock_symbols_with_exchange)
         mf_prices = await price_fetcher.get_multiple_mf_navs(mf_codes)

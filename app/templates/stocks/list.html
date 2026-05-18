@@ -5,15 +5,31 @@
 {% block content %}
 <div class="page-header">
     <h2>My Stocks</h2>
-    <a href="/stocks/add" class="btn btn-primary">+ Add Stock</a>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="/kite/sync/stocks" class="btn btn-secondary">Sync from Kite</a>
+        <a href="/stocks/add" class="btn btn-primary">+ Add Stock</a>
+    </div>
 </div>
+
+{% if request.query_params.get('sync_status') == 'success' %}
+    <div style="margin-bottom: 1rem; background: #edf7ed; border: 1px solid #4caf50; color: #1b5e20; border-radius: 6px; padding: 0.75rem 1rem;">
+        Sync complete: fetched {{ request.query_params.get('fetched', '0') }},
+        created {{ request.query_params.get('created', '0') }},
+        updated {{ request.query_params.get('updated', '0') }},
+        skipped {{ request.query_params.get('skipped', '0') }}.
+    </div>
+{% elif request.query_params.get('sync_status') == 'failed' %}
+    <div class="error-box" style="margin-bottom: 1rem;">
+        <strong>Sync failed.</strong>
+        <ul><li>Please re-login and try again.</li></ul>
+    </div>
+{% endif %}
 
 {% if stocks %}
     <table class="data-table">
         <thead>
             <tr>
                 <th>Symbol</th>
-                <th>Name</th>
                 <th>Qty</th>
                 <th>Avg Price</th>
                 <th>LTP</th>
@@ -29,9 +45,10 @@
                 <td>
                     <strong>{{ stock.symbol }}</strong>
                     <br>
-                    <small class="exchange-badge">{{ stock.exchange }}</small>
+                    <small style="color: #666;">{{ stock.name }}</small>
+                    <br>
+                    <small class="exchange-badge">{{ stock.exchange or '-' }}</small>
                 </td>
-                <td>{{ stock.name }}</td>
                 <td>{{ stock.quantity }}</td>
                 <td>₹{{ "{:,.2f}".format(stock.avg_price) }}</td>
                 <td>

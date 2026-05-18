@@ -5,8 +5,26 @@
 {% block content %}
 <div class="page-header">
     <h2>My Mutual Funds</h2>
-    <a href="/mutualfunds/add" class="btn btn-primary">+ Add Fund</a>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="/kite/sync/mutualfunds" class="btn btn-secondary">Sync from Coin</a>
+        <a href="/kite/refresh-amfi-master" class="btn btn-secondary" title="Refresh AMFI master data">🔄 Refresh AMFI</a>
+        <a href="/mutualfunds/add" class="btn btn-primary">+ Add Fund</a>
+    </div>
 </div>
+
+{% if request.query_params.get('sync_status') == 'success' %}
+    <div style="margin-bottom: 1rem; background: #edf7ed; border: 1px solid #4caf50; color: #1b5e20; border-radius: 6px; padding: 0.75rem 1rem;">
+        Sync complete: fetched {{ request.query_params.get('fetched', '0') }},
+        created {{ request.query_params.get('created', '0') }},
+        updated {{ request.query_params.get('updated', '0') }},
+        skipped {{ request.query_params.get('skipped', '0') }}.
+    </div>
+{% elif request.query_params.get('sync_status') == 'failed' %}
+    <div class="error-box" style="margin-bottom: 1rem;">
+        <strong>Sync failed.</strong>
+        <ul><li>Please re-login and try again.</li></ul>
+    </div>
+{% endif %}
 
 {% if mutual_funds %}
     <table class="data-table">
@@ -28,6 +46,9 @@
             <tr>
                 <td>
                     <strong>{{ mf.name }}</strong>
+                    {% if mf.symbol and not mf.symbol.isdigit() %}
+                        <span style="display: inline-block; margin-left: 0.5rem; font-size: 0.75rem; background: #ff9800; color: white; padding: 0.25rem 0.5rem; border-radius: 3px;">⚠️ Unresolved</span>
+                    {% endif %}
                 </td>
                 <td>{{ mf.symbol }}</td>
                 <td>{{ "{:.4f}".format(mf.quantity) }}</td>
@@ -58,6 +79,17 @@
                 </td>
                 <td>
                     <a href="/mutualfunds/edit/{{ mf.id }}" class="btn btn-secondary btn-small">✏️</a>
+                    {% if mf.symbol and not mf.symbol.isdigit() %}
+                        <button 
+                            class="btn btn-warning btn-small resolve-btn" 
+                            data-id="{{ mf.id }}"
+                            data-name="{{ mf.name }}"
+                            title="Resolve"
+                            aria-label="Resolve"
+                        >
+                            🔍
+                        </button>
+                    {% endif %}
                     <button 
                         class="btn btn-danger btn-small delete-btn" 
                         data-id="{{ mf.id }}"
@@ -89,16 +121,64 @@
         </div>
     </div>
 </div>
+
+<!-- Resolve Scheme Modal -->
+<div id="resolveModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>🔍 Resolve Scheme Code for <strong id="resolveMFName"></strong></h3>
+        <div class="form-group">
+            <label for="schemeSearch">Search Fund:</label>
+            <input 
+                type="text" 
+                id="schemeSearch" 
+                placeholder="Type fund name... (e.g., Axis Bluechip)"
+                autocomplete="off"
+            >
+            <div id="schemeSearchResults" class="search-results" style="display: block; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+        <div class="form-group">
+            <label for="selectedSchemeCode">Selected Scheme Code:</label>
+            <input 
+                type="text" 
+                id="selectedSchemeCode" 
+                placeholder="Auto-filled when you select a fund"
+                readonly
+            >
+        </div>
+        <div class="form-group">
+            <label for="selectedSchemeName">Selected Scheme Name:</label>
+            <input 
+                type="text" 
+                id="selectedSchemeName" 
+                placeholder="Auto-filled when you select a fund"
+                readonly
+            >
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeResolveModal()">Cancel</button>
+            <button class="btn btn-primary" id="confirmResolveBtn" disabled>✓ Save Resolution</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
     let mfToDelete = null;
+    let mfToResolve = null;
+    let resolveSearchTimeout = null;
 
     // Attach click handlers to all delete buttons
     document.querySelectorAll('.delete-btn').forEach(function(btn) {
         btn.onclick = function() {
             deleteMF(this.dataset.id, this.dataset.name);
+        };
+    });
+
+    // Attach click handlers to all resolve buttons
+    document.querySelectorAll('.resolve-btn').forEach(function(btn) {
+        btn.onclick = function() {
+            resolveMF(this.dataset.id, this.dataset.name);
         };
     });
     
@@ -111,6 +191,65 @@
     function closeModal() {
         document.getElementById('deleteModal').style.display = 'none';
         mfToDelete = null;
+    }
+
+    function resolveMF(id, name) {
+        mfToResolve = id;
+        document.getElementById('resolveMFName').textContent = name;
+        const schemeSearchInput = document.getElementById('schemeSearch');
+        schemeSearchInput.value = name;
+        document.getElementById('selectedSchemeCode').value = '';
+        document.getElementById('selectedSchemeName').value = '';
+        document.getElementById('schemeSearchResults').innerHTML = '';
+        document.getElementById('confirmResolveBtn').disabled = true;
+        document.getElementById('resolveModal').style.display = 'flex';
+        schemeSearchInput.focus();
+        // Auto-trigger search with the prefilled fund name.
+        schemeSearchInput.dispatchEvent(new Event('input'));
+    }
+
+    function closeResolveModal() {
+        document.getElementById('resolveModal').style.display = 'none';
+        mfToResolve = null;
+    }
+
+    // Search for schemes
+    document.getElementById('schemeSearch').addEventListener('input', function() {
+        const query = this.value.trim();
+        if (resolveSearchTimeout) clearTimeout(resolveSearchTimeout);
+        
+        if (query.length < 3) {
+            document.getElementById('schemeSearchResults').innerHTML = '';
+            return;
+        }
+
+        resolveSearchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/mutualfunds/api/search?q=${encodeURIComponent(query)}`);
+                const schemes = await response.json();
+                
+                const resultsDiv = document.getElementById('schemeSearchResults');
+                if (schemes.length === 0) {
+                    resultsDiv.innerHTML = '<div class="search-item no-results">No schemes found</div>';
+                } else {
+                    resultsDiv.innerHTML = schemes.map(scheme => `
+                        <div class="search-item" onclick="selectScheme('${scheme.scheme_code}', '${scheme.scheme_name.replace(/'/g, "\\'")}')">
+                            <strong>${scheme.scheme_name}</strong>
+                            <small>Code: ${scheme.scheme_code}</small>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }, 300);
+    });
+
+    function selectScheme(code, name) {
+        document.getElementById('selectedSchemeCode').value = code;
+        document.getElementById('selectedSchemeName').value = name;
+        document.getElementById('schemeSearchResults').innerHTML = '';
+        document.getElementById('confirmResolveBtn').disabled = false;
     }
     
     document.getElementById('confirmDeleteBtn').onclick = async function() {
@@ -132,9 +271,50 @@
         
         closeModal();
     };
-    
-    document.getElementById('deleteModal').onclick = function(e) {
-        if (e.target === this) closeModal();
+
+    document.getElementById('confirmResolveBtn').onclick = async function() {
+        if (!mfToResolve) return;
+
+        const schemeCode = document.getElementById('selectedSchemeCode').value.trim();
+        const schemeName = document.getElementById('selectedSchemeName').value.trim();
+
+        if (!schemeCode) {
+            alert('Please select a scheme');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/mutualfunds/api/${mfToResolve}/resolve-scheme`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    scheme_code: schemeCode,
+                    scheme_name: schemeName,
+                }),
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Failed to resolve scheme');
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+
+        closeResolveModal();
+    };
+
+    // Hide modals when clicking outside
+    window.onclick = function(event) {
+        const deleteModal = document.getElementById('deleteModal');
+        const resolveModal = document.getElementById('resolveModal');
+        if (event.target === deleteModal) {
+            closeModal();
+        }
+        if (event.target === resolveModal) {
+            closeResolveModal();
+        }
     };
 </script>
 {% endblock %}

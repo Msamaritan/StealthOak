@@ -11,6 +11,7 @@ import asyncio
 import warnings
 from datetime import datetime, timedelta, date as dt_date
 from typing import Optional, List, Dict, Any
+import re
 
 import httpx
 
@@ -54,18 +55,122 @@ class PriceFetcher:
     def __init__(self):
         self.timeout = settings.api_timeout
         self.mf_api_url = settings.mf_api_base_url
+        self.amfi_master_url = "https://www.amfiindia.com/spages/NAVAll.txt"
+        
+        # Corporate proxy: httpx will automatically use system proxy (http_proxy, https_proxy env vars)
+        # verify=False bypasses SSL cert validation (similar to kiteconnect approach for corporate proxies)
         self.client_kwargs = {
-            "timeout": self.timeout,
-            "verify": False,  # Corporate proxy workaround
+            "timeout": 30.0,  # Increased from 10s to account for corporate proxy latency
+            "verify": False,  # Corporate proxy workaround - bypasses SSL cert validation
+            "trust_env": True,  # CRITICAL: Use system proxy settings (http_proxy, https_proxy env vars)
         }
-        # Common headers to mimic a browser and avoid blocking thinking it is from a script or bot
-        # This says the yahoo finance API that we are a chrome browser on windows 10, which is a common user agent string
+        
+        # Add explicit proxy if configured in settings
+        if settings.https_proxy:
+            self.client_kwargs["proxies"] = settings.https_proxy
+        elif settings.http_proxy:
+            self.client_kwargs["proxies"] = settings.http_proxy
+        
+        # Common headers to mimic a browser and avoid blocking
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
 
         # Cache: 15 minutes TTL
         self.cache = SimpleCache(ttl_seconds=settings.price_cache_ttl)
+        self._amfi_cache_data: Optional[Dict[str, Dict[str, Any]]] = None
+
+    def _parse_amfi_date(self, date_value: str) -> Optional[dt_date]:
+        raw = (date_value or "").strip()
+        if not raw:
+            return None
+        for fmt in ("%d-%b-%Y", "%d-%m-%Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(raw, fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    async def get_amfi_isin_scheme_map(self, force_refresh: bool = False) -> Dict[str, Dict[str, Any]]:
+        """
+        Build mapping from ISIN to AMFI scheme metadata.
+        
+        Cache is kept indefinitely in-memory. Use force_refresh=True to download fresh data.
+
+        Args:
+            force_refresh: If True, re-download master data even if cached.
+
+        Returns:
+            {
+                "INF179K01UT0": {
+                    "scheme_code": "120716",
+                    "scheme_name": "HDFC Flexi Cap Fund - Direct Plan - Growth Option",
+                    "nav": 123.4567,
+                    "date": "2026-05-17"
+                },
+                ...
+            }
+        """
+        if not force_refresh and self._amfi_cache_data is not None:
+            return self._amfi_cache_data
+
+        async with httpx.AsyncClient(**self.client_kwargs) as client:
+            try:
+                response = await client.get(self.amfi_master_url, timeout=30.0)
+                response.raise_for_status()
+                text = response.text
+            except httpx.TimeoutException as e:
+                print(f"[AMFI] Timeout: {e}")
+                print("[AMFI] → Set corporate proxy env vars: http_proxy, https_proxy, no_proxy")
+                print("[AMFI] → Or increase API timeout in config")
+                raise
+            except Exception as e:
+                print(f"[AMFI] Failed to fetch from {self.amfi_master_url}: {e}")
+                print("[AMFI] → Check network/firewall/proxy settings")
+                raise
+
+        mapping: Dict[str, Dict[str, Any]] = {}
+        for line in text.splitlines():
+            row = line.strip()
+            if not row or ";" not in row:
+                continue
+
+            parts = [p.strip() for p in row.split(";")]
+            if len(parts) < 6:
+                continue
+
+            scheme_code = parts[0]
+            isin_growth_or_payout = parts[1]
+            isin_div_reinv = parts[2]
+            scheme_name = parts[3]
+            nav_raw = parts[4]
+            nav_date_raw = parts[5]
+
+            if not re.fullmatch(r"\d+", scheme_code):
+                continue
+
+            nav_value: Optional[float] = None
+            try:
+                nav_value = float(nav_raw)
+            except (TypeError, ValueError):
+                nav_value = None
+
+            nav_date = self._parse_amfi_date(nav_date_raw)
+
+            payload = {
+                "scheme_code": scheme_code,
+                "scheme_name": scheme_name,
+                "nav": nav_value,
+                "date": nav_date.isoformat() if nav_date else None,
+            }
+
+            for isin in (isin_growth_or_payout, isin_div_reinv):
+                key = (isin or "").strip().upper()
+                if key:
+                    mapping[key] = payload
+
+        self._amfi_cache_data = mapping
+        return mapping
     
     async def _request_with_retry(
         self, 
@@ -425,6 +530,45 @@ class PriceFetcher:
         tasks = [self.get_mf_nav(code) for code in scheme_codes]
         results = await asyncio.gather(*tasks)
         return dict(zip(scheme_codes, results))
+
+    async def search_mf_schemes(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Search for mutual fund schemes by name (via mfapi).
+        
+        Args:
+            query: Fund name or scheme code to search for
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of schemes: [{"scheme_code": "120716", "scheme_name": "...", "nav": 123.45}, ...]
+        """
+        if not query.strip():
+            return []
+
+        try:
+            async with httpx.AsyncClient(**self.client_kwargs) as client:
+                # mfapi endpoint: /mf/search
+                url = f"https://www.mfapi.in/mf/search/{query}"
+                response = await client.get(url, timeout=10.0)
+                response.raise_for_status()
+                data = response.json()
+
+                if "data" not in data or not isinstance(data["data"], list):
+                    return []
+
+                # Extract scheme code and name from results
+                results = []
+                for item in data["data"][:limit]:
+                    if "schemeCode" in item and "schemeName" in item:
+                        results.append({
+                            "scheme_code": str(item["schemeCode"]),
+                            "scheme_name": item["schemeName"],
+                        })
+
+                return results
+        except Exception as e:
+            print(f"Failed to search MF schemes: {e}")
+            return []
 
 
 # Singleton

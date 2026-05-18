@@ -1,12 +1,15 @@
 """
 KiteConnect integration service for Zerodha API
 """
+import csv
+import io
 import logging
 import urllib3
 import warnings
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 
+import httpx
 from kiteconnect import KiteConnect
 
 logger = logging.getLogger(__name__)
@@ -27,6 +30,7 @@ class KiteService:
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.access_token = access_token
         self.kite = KiteConnect(api_key=api_key, disable_ssl=disable_ssl)
 
         if disable_ssl:
@@ -65,6 +69,7 @@ class KiteService:
     
     def set_access_token(self, access_token: str) -> None:
         """Set access token for authenticated requests"""
+        self.access_token = access_token
         self.kite.set_access_token(access_token)
     
     def is_authenticated(self) -> bool:
@@ -234,6 +239,36 @@ class KiteService:
             return mf_holdings
         except Exception as e:
             logger.error(f"Failed to fetch MF holdings: {e}")
+            raise
+
+    def get_mf_instruments(self) -> List[Dict[str, Any]]:
+        """
+        Fetch MF instruments master list from Kite (/mf/instruments).
+
+        Returns:
+            List of instrument rows with keys like tradingsymbol, name, plan, dividend_type.
+        """
+        if not self.access_token:
+            raise ValueError("Access token not set")
+
+        url = "https://api.kite.trade/mf/instruments"
+        headers = {
+            "X-Kite-Version": "3",
+            "Authorization": f"token {self.api_key}:{self.access_token}",
+        }
+
+        try:
+            with httpx.Client(timeout=30.0, verify=False) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+
+            csv_text = response.text
+            reader = csv.DictReader(io.StringIO(csv_text))
+            rows = [dict(row) for row in reader if row.get("tradingsymbol")]
+            logger.info(f"Fetched {len(rows)} MF instruments")
+            return rows
+        except Exception as e:
+            logger.error(f"Failed to fetch MF instruments: {e}")
             raise
 
 

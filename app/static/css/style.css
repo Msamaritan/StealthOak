@@ -557,11 +557,8 @@ a:hover {
    SEARCH RESULTS
    -------------------------------------------- */
 .search-results {
-    display: none;
-    position: absolute;
+    position: relative;
     width: 100%;
-    max-height: 300px;
-    overflow-y: auto;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
