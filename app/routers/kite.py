@@ -298,6 +298,25 @@ def _mf_identity_key(symbol: str, isin: str | None) -> tuple:
     return ("symbol", symbol)
 
 
+def _is_kite_auth_error(error_text: str, error_trace: str) -> bool:
+    """Detect token/session/auth failures from KiteConnect exceptions/logs."""
+    blob = f"{error_text}\n{error_trace}".lower()
+    auth_markers = (
+        "tokenexception",
+        "accesstoken",
+        "access token",
+        "invalid session",
+        "session expired",
+        "session has expired",
+        "incorrect `api_key` or `access_token`",
+        "incorrect api_key or access_token",
+        "invalid token",
+        "authorizationexception",
+        "not authenticated",
+    )
+    return any(marker in blob for marker in auth_markers)
+
+
 async def _get_authenticated_kite(db: AsyncSession):
     """Return an authenticated Kite service from memory or persisted session."""
     kite = get_kite_service()
@@ -459,6 +478,7 @@ async def sync_kite_holdings(
                 existing = existing_map.get(key)
 
                 if not existing:
+                    # Create new holding if it doesn't exist
                     holding = Holding(
                         portfolio_id=portfolio.id,
                         symbol=row["symbol"],
@@ -474,28 +494,28 @@ async def sync_kite_holdings(
                     )
                     db.add(holding)
                     created += 1
-                    continue
-
-                unchanged = (
-                    round(existing.quantity, 6) == round(row["quantity"], 6)
-                    and round(existing.avg_price, 6) == round(row["avg_price"], 6)
-                    and (existing.name or "") == (row["name"] or "")
-                    and (existing.exchange or "") == (row["exchange"] or "")
-                )
-
-                if unchanged:
-                    skipped += 1
                 else:
-                    existing.name = row["name"]
-                    existing.exchange = row["exchange"]
-                    existing.quantity = row["quantity"]
-                    existing.avg_price = row["avg_price"]
-                    existing.isin = row.get("isin")
-                    existing.instrument_token = row.get("instrument_token")
-                    existing.source = row.get("source", existing.source)
-                    updated += 1
+                    # Update existing holding if necessary
+                    unchanged = (
+                        round(existing.quantity, 6) == round(row["quantity"], 6)
+                        and round(existing.avg_price, 6) == round(row["avg_price"], 6)
+                        and (existing.name or "") == (row["name"] or "")
+                        and (existing.exchange or "") == (row["exchange"] or "")
+                    )
 
-                existing.last_synced_at = dt.datetime.utcnow()
+                    if unchanged:
+                        skipped += 1
+                    else:
+                        existing.name = row["name"]
+                        existing.exchange = row["exchange"]
+                        existing.quantity = row["quantity"]
+                        existing.avg_price = row["avg_price"]
+                        existing.isin = row.get("isin")
+                        existing.instrument_token = row.get("instrument_token")
+                        existing.source = row.get("source", existing.source)
+                        updated += 1
+
+                    existing.last_synced_at = dt.datetime.utcnow()
 
         else:
             raw_holdings = kite.get_mf_holdings()
@@ -688,9 +708,9 @@ async def sync_kite_holdings(
         error_msg = f"{str(exc)} | {error_trace}"
         print(f"[SYNC {asset_kind}] ERROR: {error_msg}")
 
-        # If Kite access token has expired, force re-login flow instead of a generic failure banner.
+        # If Kite session is invalid/expired, force re-login flow instead of generic failure banner.
         error_text = str(exc)
-        if "Incorrect `api_key` or `access_token`" in error_text or "TokenException" in error_trace:
+        if _is_kite_auth_error(error_text, error_trace):
             result = await db.execute(select(KiteSession).where(KiteSession.is_active.is_(True)))
             for session in result.scalars().all():
                 session.is_active = False

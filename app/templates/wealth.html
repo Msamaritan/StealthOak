@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Wealth - StealthOak{% endblock %}
+
+{% block content %}
+<div class="wealth-page">
+    <h2>Wealth</h2>
+
+    <!-- Top 3 Metric Cards -->
+    <div class="metrics-row wealth-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Total Invested</span>
+            <span class="metric-value">₹{{ "{:,.2f}".format(total_invested) }}</span>
+            {% if total_invested > 0 %}
+            <div class="metric-breakdown">
+                <span class="breakdown-stock">📈 {{ stock_alloc }}%</span>
+                {% if gold_alloc > 0 %}<span class="breakdown-gold">🥇 {{ gold_alloc }}%</span>{% endif %}
+                {% if silver_alloc > 0 %}<span class="breakdown-silver">🥈 {{ silver_alloc }}%</span>{% endif %}
+                <span class="breakdown-mf">💼 {{ mf_alloc }}%</span>
+                <span class="breakdown-ppf">🏦 {{ ppf_alloc }}%</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="metric-card">
+            <span class="metric-label">Total Current Value</span>
+            <span class="metric-value {% if total_current >= total_invested %}profit{% else %}loss{% endif %}">
+                ₹{{ "{:,.2f}".format(total_current) }}
+                {% if total_invested > 0 %}
+                <small>({{ "{:+.2f}".format(total_pnl_percent) }}%)</small>
+                {% endif %}
+            </span>
+        </div>
+
+        <div class="metric-card">
+            <span class="metric-label">Total P&amp;L</span>
+            <span class="metric-value {% if total_pnl >= 0 %}profit{% else %}loss{% endif %}">
+                {% if total_pnl >= 0 %}+{% endif %}₹{{ "{:,.2f}".format(total_pnl) }}
+                <small>({{ "{:+.2f}".format(total_pnl_percent) }}%)</small>
+            </span>
+        </div>
+    </div>
+
+    <!-- Asset Valuation Table -->
+    <div class="content-card">
+        <h3>Asset Valuation</h3>
+        <table class="data-table wealth-table">
+            <thead>
+                <tr>
+                    <th>Asset</th>
+                    <th>Allocation</th>
+                    <th>Invested</th>
+                    <th>Current</th>
+                    <th>P&amp;L</th>
+                    <th>P&amp;L %</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in asset_rows %}
+                <tr>
+                    <td><strong>{{ row.asset }}</strong></td>
+                    <td class="text-muted">{{ row.alloc_percent }}%</td>
+                    <td>₹{{ "{:,.2f}".format(row.invested) }}</td>
+                    <td>₹{{ "{:,.2f}".format(row.current) }}</td>
+                    <td class="{% if row.pnl >= 0 %}profit{% else %}loss{% endif %}">
+                        {% if row.pnl >= 0 %}+{% endif %}₹{{ "{:,.2f}".format(row.pnl) }}
+                    </td>
+                    <td class="{% if row.pnl_percent >= 0 %}profit{% else %}loss{% endif %}">
+                        {{ "{:+.2f}".format(row.pnl_percent) }}%
+                    </td>
+                    <td>
+                        {% if row.asset == 'PPF' %}
+                        <div class="ppf-actions">
+                            <button class="btn btn-small btn-primary ppf-btn-add" title="Add Transaction">+</button>
+                            <button class="btn btn-small btn-secondary ppf-btn-history" title="Transaction History">📒</button>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add PPF Transaction Modal -->
+<div id="ppfAddModal" class="modal" style="display:none">
+    <div class="modal-content">
+        <h3>Add PPF Transaction</h3>
+        <div id="ppfAddErrors" class="error-box" style="display:none"></div>
+        <form id="ppfAddForm" class="add-form">
+            <div class="form-group">
+                <label for="ppf_type">Type</label>
+                <select id="ppf_type" name="transaction_type" required>
+                    <option value="deposit">💰 Deposit</option>
+                    <option value="interest">📈 Interest</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="ppf_amount">Amount (₹)</label>
+                    <input id="ppf_amount" type="number" name="amount" step="0.01" min="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="ppf_date">Date</label>
+                    <input id="ppf_date" type="date" name="transaction_date" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="ppf_note">Note <small>(optional)</small></label>
+                <input id="ppf_note" type="text" name="note" placeholder="e.g. FY 2025-26 deposit" maxlength="200">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="ppfAddCancel">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- PPF Transaction History Modal -->
+<div id="ppfHistoryModal" class="modal" style="display:none">
+    <div class="modal-content modal-wide">
+        <h3>PPF Transaction History</h3>
+        <div id="ppfHistoryContent"><p class="empty-message">Loading...</p></div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" id="ppfHistoryClose">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    var addModal  = document.getElementById('ppfAddModal');
+    var histModal = document.getElementById('ppfHistoryModal');
+    var addForm   = document.getElementById('ppfAddForm');
+    var addErrors = document.getElementById('ppfAddErrors');
+    var dateInput = document.getElementById('ppf_date');
+
+    function openAddModal() {
+        addErrors.style.display = 'none';
+        addForm.reset();
+        dateInput.valueAsDate = new Date();
+        addModal.style.display = 'flex';
+    }
+
+    function closeAddModal() {
+        addModal.style.display = 'none';
+    }
+
+    async function openHistoryModal() {
+        document.getElementById('ppfHistoryContent').innerHTML = '<p class="empty-message">Loading...</p>';
+        histModal.style.display = 'flex';
+        var resp = await fetch('/wealth/ppf/transactions');
+        var data = await resp.json();
+
+        if (!data.transactions || data.transactions.length === 0) {
+            document.getElementById('ppfHistoryContent').innerHTML =
+                '<p class="empty-message">No transactions yet. Click + to add one.</p>';
+            return;
+        }
+
+        var html = '<table class="data-table"><thead><tr>'
+            + '<th>Date</th><th>Type</th><th>Amount</th><th>Note</th>'
+            + '</tr></thead><tbody>';
+
+        data.transactions.forEach(function (t) {
+            var label = t.type === 'deposit' ? '💰 Deposit' : '📈 Interest';
+            var cls   = t.type === 'interest' ? 'profit' : '';
+            html += '<tr>'
+                + '<td>' + t.date + '</td>'
+                + '<td>' + label + '</td>'
+                + '<td class="' + cls + '">₹' + Number(t.amount).toLocaleString('en-IN', {minimumFractionDigits: 2}) + '</td>'
+                + '<td>' + (t.note || '—') + '</td>'
+                + '</tr>';
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('ppfHistoryContent').innerHTML = html;
+    }
+
+    function closeHistoryModal() {
+        histModal.style.display = 'none';
+    }
+
+    addForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var formData = new FormData(addForm);
+        var resp = await fetch('/wealth/ppf/transaction', { method: 'POST', body: formData });
+        var data = await resp.json();
+
+        if (data.success) {
+            closeAddModal();
+            window.location.reload();
+        } else {
+            addErrors.innerHTML = '<strong>Please fix:</strong><ul>'
+                + data.errors.map(function (err) { return '<li>' + err + '</li>'; }).join('')
+                + '</ul>';
+            addErrors.style.display = 'block';
+        }
+    });
+
+    document.querySelector('.ppf-btn-add').addEventListener('click', openAddModal);
+    document.querySelector('.ppf-btn-history').addEventListener('click', openHistoryModal);
+    document.getElementById('ppfAddCancel').addEventListener('click', closeAddModal);
+    document.getElementById('ppfHistoryClose').addEventListener('click', closeHistoryModal);
+    addModal.addEventListener('click',  function (e) { if (e.target === addModal)  closeAddModal(); });
+    histModal.addEventListener('click', function (e) { if (e.target === histModal) closeHistoryModal(); });
+}());
+</script>
+{% endblock %}

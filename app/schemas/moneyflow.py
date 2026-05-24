@@ -121,7 +121,8 @@ class BrokerCreditBrief(BaseModel):
 
 class MoneyFlowInvestmentCreate(BaseModel):
     """Schema for creating a new investment"""
-    broker_credit_id: int
+    broker_credit_id: Optional[int] = None
+    bank_transfer_id: Optional[int] = None
     date: dt.date
     amount: float = Field(gt=0, description="Amount must be positive")
     holding_name: str = Field(min_length=1, max_length=100)

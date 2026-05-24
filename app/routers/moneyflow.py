@@ -1355,33 +1355,69 @@ async def create_investment(
     data: MoneyFlowInvestmentCreate,
     session: AsyncSession = Depends(get_db)
 ):
-    """Create a new investment (from broker credit)"""
-    # Validate broker credit exists and has enough idle amount
-    query = (
-        select(BrokerCredit)
-        .options(selectinload(BrokerCredit.investments))
-        .where(BrokerCredit.id == data.broker_credit_id)
-    )
-    result = await session.execute(query)
-    broker_credit = result.scalar_one_or_none()
+    """Create a new investment from broker credit or direct bank transfer (PPF)."""
+    broker_credit = None
 
-    if not broker_credit:
-        raise HTTPException(status_code=404, detail="Broker credit not found")
-
-    if broker_credit.destination_type == "savings":
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot create investments for savings type (PPF/NPS)"
+    if data.broker_credit_id:
+        query = (
+            select(BrokerCredit)
+            .options(selectinload(BrokerCredit.investments))
+            .where(BrokerCredit.id == data.broker_credit_id)
         )
+        result = await session.execute(query)
+        broker_credit = result.scalar_one_or_none()
 
-    if data.amount > broker_credit.idle_amount:
+        if not broker_credit:
+            raise HTTPException(status_code=404, detail="Broker credit not found")
+
+        if broker_credit.destination_type == "savings":
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot create investments for savings type (PPF/NPS)"
+            )
+
+        if data.amount > broker_credit.idle_amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Amount exceeds available idle amount (₹{broker_credit.idle_amount})"
+            )
+    elif data.bank_transfer_id:
+        transfer_query = (
+            select(BankTransfer)
+            .options(selectinload(BankTransfer.broker_credits))
+            .where(BankTransfer.id == data.bank_transfer_id)
+        )
+        result = await session.execute(transfer_query)
+        bank_transfer = result.scalar_one_or_none()
+
+        if not bank_transfer:
+            raise HTTPException(status_code=404, detail="Bank transfer not found")
+
+        if data.amount > bank_transfer.idle_amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Amount exceeds available idle amount (₹{bank_transfer.idle_amount})"
+            )
+
+        # Bridge the bank transfer to investments without exposing savings in the broker card flow.
+        broker_credit = BrokerCredit(
+            bank_transfer_id=bank_transfer.id,
+            date=data.date,
+            amount=data.amount,
+            destination="PPF",
+            destination_type="savings",
+            notes=data.notes or "Direct PPF investment from bank transfer",
+        )
+        session.add(broker_credit)
+        await session.flush()
+    else:
         raise HTTPException(
             status_code=400,
-            detail=f"Amount exceeds available idle amount (₹{broker_credit.idle_amount})"
+            detail="Either broker_credit_id or bank_transfer_id is required"
         )
 
     investment = MoneyFlowInvestment(
-        broker_credit_id=data.broker_credit_id,
+        broker_credit_id=broker_credit.id,
         date=data.date,
         amount=data.amount,
         holding_name=data.holding_name,
@@ -1607,7 +1643,7 @@ async def _calculate_summary(session: AsyncSession, date_start: dt.date = None, 
 
     # Calculate totals
     total_bank = sum(bt.amount for bt in bank_transfers)
-    total_broker = sum(bc.amount for bc in broker_credits)
+    total_broker = sum(bc.amount for bc in broker_credits if bc.destination_type == "broker")
     total_invested = sum(inv.amount for inv in investments)
 
     # Calculate idle amounts

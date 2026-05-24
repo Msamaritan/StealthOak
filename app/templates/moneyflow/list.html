@@ -91,8 +91,9 @@
                 <button class="btn-add" onclick="openBrokerModal()">+ Add</button>
             </div>
             <div class="column-cards" id="brokerCards">
-                {% if broker_credits %}
-                    {% for bc in broker_credits %}
+                {% set visible_broker_credits = broker_credits | selectattr('destination_type', 'equalto', 'broker') | list %}
+                {% if visible_broker_credits %}
+                    {% for bc in visible_broker_credits %}
                     <div class="flow-card {% if bc.is_complete %}status-complete{% elif bc.idle_amount > 0 %}status-partial{% else %}status-complete{% endif %}" 
                          data-id="{{ bc.id }}" 
                          data-type="broker"
@@ -123,7 +124,6 @@
                         <div class="card-notes">{{ bc.notes }}</div>
                         {% endif %}
                         <div class="card-actions">
-                            {% if bc.destination_type == 'broker' %}
                             {% if bc.idle_amount > 0 %}
                             <button
                                 class="btn-action btn-primary"
@@ -142,7 +142,6 @@
                                 data-idle-amount="{{ bc.idle_amount }}"
                                 {% if bc.idle_amount <= 0 %}disabled title="No idle amount available"{% endif %}
                                 onclick="openRunSIPModalFromButton(this)">Run SIPs</button>
-                            {% endif %}
                             {% endif %}
                             <button class="btn-action btn-secondary" onclick="openEditBrokerModal('{{ bc.id }}')">Edit</button>
                             <button class="btn-action btn-danger" onclick="deleteEntry('broker-credits', '{{ bc.id }}')">×</button>
@@ -688,12 +687,14 @@
         </div>
         <form id="investmentForm" onsubmit="saveInvestmentDirect(event)">
             <input type="hidden" id="investmentEditId" value="">
-            <input type="hidden" id="investmentAssetType" value="">
-            <input type="hidden" id="investmentAssetSymbol" value="">
-            <input type="hidden" id="investmentAssetExchange" value="">
-            <input type="hidden" id="investmentAssetSchemeCode" value="">
-            <input type="hidden" id="investmentUnitPrice" value="">
             <div class="form-group">
+                <label for="investmentMode">Investment Type</label>
+                <select id="investmentMode" onchange="toggleInvestmentMode()">
+                    <option value="regular">Stock / Mutual Fund</option>
+                    <option value="ppf">PPF Deposit</option>
+                </select>
+            </div>
+            <div class="form-group" id="investmentBrokerCreditGroup">
                 <label for="investmentBrokerCredit">From Broker Credit</label>
                 <select id="investmentBrokerCredit" required>
                     <option value="">Select Broker Credit</option>
@@ -706,25 +707,43 @@
                     {% endfor %}
                 </select>
             </div>
+            <div class="form-group" id="investmentBankTransferGroup" style="display:none;">
+                <label for="investmentBankTransfer">From Bank Transfer</label>
+                <select id="investmentBankTransfer">
+                    <option value="">Select Bank Transfer</option>
+                    {% for bt in bank_transfers %}
+                        {% if bt.idle_amount > 0 %}
+                        <option value="{{ bt.id }}" data-idle="{{ bt.idle_amount }}">
+                            {{ bt.source_bank }} - {{ bt.date.strftime('%d %b %Y') }} (₹{{ "{:,.2f}".format(bt.idle_amount) }} idle)
+                        </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <input type="hidden" id="investmentAssetType" value="">
+            <input type="hidden" id="investmentAssetSymbol" value="">
+            <input type="hidden" id="investmentAssetExchange" value="">
+            <input type="hidden" id="investmentAssetSchemeCode" value="">
+            <input type="hidden" id="investmentUnitPrice" value="">
             <div class="form-group">
                 <label for="investmentDate">Date</label>
                 <input type="date" id="investmentDate" required>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="investmentAssetSearchGroup">
                 <label for="investmentAssetSearch">Search Stock / Mutual Fund</label>
                 <input type="text" id="investmentAssetSearch" placeholder="Type name or symbol..." autocomplete="off">
                 <small>Select one result before clicking Fetch.</small>
                 <div id="investmentAssetSearchResults" class="asset-search-results"></div>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="investmentHoldingGroup">
                 <label for="investmentHolding">Stock / Mutual Fund</label>
                 <input type="text" id="investmentHolding" placeholder="Selected from search" required maxlength="100" readonly>
             </div>
-            <div class="form-group unit-price-group">
+            <div class="form-group unit-price-group" id="investmentUnitPriceGroup">
                 <button type="button" class="btn-action btn-secondary" onclick="fetchHistoricalUnitPrice('investment')">Fetch 1 Unit Price</button>
                 <small id="investmentUnitPriceInfo">Unit price will appear here after fetch.</small>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="investmentUnitsGroup">
                 <label for="investmentUnits">Units</label>
                 <input type="number" id="investmentUnits" placeholder="e.g., 10.5" min="0.0001" step="0.0001" oninput="updateAmountFromUnits('investment')">
             </div>
@@ -1958,19 +1977,22 @@ function openInvestModalFromButton(button) {
 function openInvestmentModal() {
     document.getElementById('investmentModalTitle').textContent = '📈 New Investment';
     document.getElementById('investmentEditId').value = '';
+    document.getElementById('investmentMode').value = 'regular';
     document.getElementById('investmentDate').value = getTodayDate();
     resetInvestmentPricingUi('investment', true);
+    toggleInvestmentMode();
     openModal('investment');
 }
 
 function openEditInvestmentModal(id) {
     document.getElementById('investmentModalTitle').textContent = '📈 Edit Investment';
     document.getElementById('investmentEditId').value = id;
+    document.getElementById('investmentMode').value = 'regular';
+    toggleInvestmentMode();
     
     fetch(`${API_BASE}/investments/${id}`)
         .then(res => res.json())
-        .then(data => {
-            document.getElementById('investmentBrokerCredit').value = data.broker_credit_id;
+        .then(async data => {
             document.getElementById('investmentDate').value = data.date;
             document.getElementById('investmentHolding').value = data.holding_name;
             document.getElementById('investmentAmount').value = data.amount;
@@ -1979,9 +2001,114 @@ function openEditInvestmentModal(id) {
             document.getElementById('investmentUnits').value = '';
             document.getElementById('investmentUnitPriceInfo').textContent = 'Re-select asset and click Fetch if you want unit-based recalculation.';
             document.getElementById('investmentNotes').value = data.notes || '';
+
+            // For PPF/savings-backed investments, open in PPF mode and bind bank transfer.
+            try {
+                const creditRes = await fetch(`${API_BASE}/broker-credits/${data.broker_credit_id}`);
+                if (creditRes.ok) {
+                    const creditData = await creditRes.json();
+
+                    ensureSelectOption(
+                        'investmentBrokerCredit',
+                        String(creditData.id),
+                        `${creditData.destination} - ${creditData.date} (linked)`
+                    );
+
+                    if (
+                        creditData.destination_type === 'savings' ||
+                        String(creditData.destination || '').toLowerCase() === 'ppf' ||
+                        String(data.holding_name || '').toLowerCase() === 'ppf'
+                    ) {
+                        document.getElementById('investmentMode').value = 'ppf';
+                        toggleInvestmentMode();
+                        document.getElementById('investmentHolding').value = 'PPF';
+                        ensureSelectOption(
+                            'investmentBankTransfer',
+                            String(creditData.bank_transfer_id),
+                            `${creditData.source_bank || 'Bank'} - ${creditData.source_date || creditData.date} (linked)`
+                        );
+                        document.getElementById('investmentBankTransfer').value = creditData.bank_transfer_id;
+                    } else {
+                        document.getElementById('investmentBrokerCredit').value = creditData.id;
+                    }
+                } else {
+                    ensureSelectOption(
+                        'investmentBrokerCredit',
+                        String(data.broker_credit_id),
+                        `Broker Credit #${data.broker_credit_id} (linked)`
+                    );
+                    document.getElementById('investmentBrokerCredit').value = data.broker_credit_id;
+                }
+            } catch (_) {
+                ensureSelectOption(
+                    'investmentBrokerCredit',
+                    String(data.broker_credit_id),
+                    `Broker Credit #${data.broker_credit_id} (linked)`
+                );
+                document.getElementById('investmentBrokerCredit').value = data.broker_credit_id;
+            }
+
             openModal('investment');
         })
         .catch(err => showError('Failed to load data'));
+}
+
+function ensureSelectOption(selectId, value, label) {
+    const select = document.getElementById(selectId);
+    if (!select || !value) {
+        return;
+    }
+
+    const exists = Array.from(select.options).some(opt => opt.value === value);
+    if (!exists) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        select.appendChild(option);
+    }
+}
+
+function toggleInvestmentMode() {
+    const mode = document.getElementById('investmentMode').value;
+    const brokerGroup = document.getElementById('investmentBrokerCreditGroup');
+    const bankGroup = document.getElementById('investmentBankTransferGroup');
+    const assetSearchGroup = document.getElementById('investmentAssetSearchGroup');
+    const holdingGroup = document.getElementById('investmentHoldingGroup');
+    const unitPriceGroup = document.getElementById('investmentUnitPriceGroup');
+    const unitsGroup = document.getElementById('investmentUnitsGroup');
+    const brokerSelect = document.getElementById('investmentBrokerCredit');
+    const bankSelect = document.getElementById('investmentBankTransfer');
+    const holdingInput = document.getElementById('investmentHolding');
+
+    if (mode === 'ppf') {
+        brokerGroup.style.display = 'none';
+        assetSearchGroup.style.display = 'none';
+        holdingGroup.style.display = 'none';
+        unitPriceGroup.style.display = 'none';
+        unitsGroup.style.display = 'none';
+        bankGroup.style.display = 'block';
+
+        brokerSelect.required = false;
+        bankSelect.required = true;
+        holdingInput.required = false;
+        holdingInput.value = 'PPF';
+        document.getElementById('investmentAssetType').value = 'ppf';
+    } else {
+        brokerGroup.style.display = 'block';
+        assetSearchGroup.style.display = 'block';
+        holdingGroup.style.display = 'block';
+        unitPriceGroup.style.display = 'block';
+        unitsGroup.style.display = 'block';
+        bankGroup.style.display = 'none';
+
+        brokerSelect.required = true;
+        bankSelect.required = false;
+        holdingInput.required = true;
+        if (holdingInput.value === 'PPF') {
+            holdingInput.value = '';
+        }
+        document.getElementById('investmentAssetType').value = '';
+    }
 }
 
 // ============================================
@@ -2155,13 +2282,20 @@ async function saveInvestmentDirect(event) {
     event.preventDefault();
     
     const editId = document.getElementById('investmentEditId').value;
+    const mode = document.getElementById('investmentMode').value;
     const data = {
-        broker_credit_id: parseInt(document.getElementById('investmentBrokerCredit').value),
         date: document.getElementById('investmentDate').value,
         holding_name: document.getElementById('investmentHolding').value,
         amount: parseFloat(document.getElementById('investmentAmount').value),
         notes: document.getElementById('investmentNotes').value || null
     };
+
+    if (mode === 'ppf') {
+        data.bank_transfer_id = parseInt(document.getElementById('investmentBankTransfer').value);
+        data.holding_name = 'PPF';
+    } else {
+        data.broker_credit_id = parseInt(document.getElementById('investmentBrokerCredit').value);
+    }
     
     const url = editId ? `${API_BASE}/investments/${editId}` : `${API_BASE}/investments`;
     const method = editId ? 'PUT' : 'POST';
@@ -3072,6 +3206,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }).join(', ');
             datesDisplay.textContent = datesText;
             datesDisplay.style.display = 'block';
+        }
+
+        // Fallback for normal notes (including manual PPF deposits) that are not SIP metadata.
+        if (!parsed.frequency && (!parsed.dates || parsed.dates.length === 0)) {
+            notesDiv.textContent = notes;
         }
     });
 

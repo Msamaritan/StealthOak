@@ -11,6 +11,28 @@
     </div>
 </div>
 
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has("sync_status")) {
+            return;
+        }
+
+        window.setTimeout(() => {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("sync_status");
+            url.searchParams.delete("fetched");
+            url.searchParams.delete("created");
+            url.searchParams.delete("updated");
+            url.searchParams.delete("skipped");
+            url.searchParams.delete("resolved");
+            url.searchParams.delete("unresolved");
+            url.searchParams.delete("error");
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+        }, 3000);
+    });
+</script>
+
 {% if request.query_params.get('sync_status') == 'success' %}
     <div style="margin-bottom: 1rem; background: #edf7ed; border: 1px solid #4caf50; color: #1b5e20; border-radius: 6px; padding: 0.75rem 1rem;">
         Sync complete: fetched {{ request.query_params.get('fetched', '0') }},
@@ -26,23 +48,23 @@
 {% endif %}
 
 {% if stocks %}
-    <table class="data-table">
+    <table class="data-table" id="stocksTable">
         <thead>
             <tr>
-                <th>Symbol</th>
-                <th>Qty</th>
-                <th>Avg Price</th>
-                <th>LTP</th>
-                <th>Invested</th>
-                <th>Current</th>
-                <th>P&L</th>
-                <th>Actions</th>
+                <th data-sort-type="text">Symbol</th>
+                <th data-sort-type="number">Qty</th>
+                <th data-sort-type="number">Avg Price</th>
+                <th data-sort-type="number">LTP</th>
+                <th data-sort-type="number">Invested</th>
+                <th data-sort-type="number">Current</th>
+                <th data-sort-type="number">P&L</th>
+                <th data-sort-type="none">Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for stock in stocks %}
             <tr>
-                <td>
+                <td data-sort-value="{{ stock.symbol|lower }}">
                     <strong>{{ stock.symbol }}</strong>
                     <br>
                     <small style="color: #666;">{{ stock.name }}</small>
@@ -89,6 +111,72 @@
             {% endfor %}
         </tbody>
     </table>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const table = document.getElementById("stocksTable");
+            if (!table) {
+                return;
+            }
+
+            const headers = Array.from(table.querySelectorAll("thead th"));
+            const tbody = table.querySelector("tbody");
+            let sortState = { index: -1, direction: 1 };
+
+            const parseCellValue = (cell, type) => {
+                const raw = (cell.getAttribute("data-sort-value") || cell.textContent || "").trim();
+                if (type === "number") {
+                    const normalized = raw
+                        .replace(/\s+/g, " ")
+                        .replace(/^[^\d+\-]*([+\-]?[\d,.]+)/, "$1")
+                        .replace(/,/g, "");
+                    const value = Number.parseFloat(normalized);
+                    return Number.isNaN(value) ? Number.NEGATIVE_INFINITY : value;
+                }
+                return raw.toLowerCase();
+            };
+
+            const updateIndicators = (activeIndex, direction) => {
+                headers.forEach((header, index) => {
+                    if (header.dataset.sortType === "none") {
+                        header.textContent = "Actions";
+                        return;
+                    }
+
+                    const base = header.dataset.label || header.textContent.replace(/[▲▼]\s*$/, "");
+                    header.dataset.label = base;
+                    header.textContent = base + (index === activeIndex ? (direction > 0 ? " ▲" : " ▼") : "");
+                });
+            };
+
+            headers.forEach((header, index) => {
+                if (header.dataset.sortType === "none") {
+                    return;
+                }
+
+                header.style.cursor = "pointer";
+                header.addEventListener("click", () => {
+                    const direction = sortState.index === index ? sortState.direction * -1 : 1;
+                    const rows = Array.from(tbody.querySelectorAll("tr"));
+                    const type = header.dataset.sortType || "text";
+
+                    rows.sort((leftRow, rightRow) => {
+                        const leftCell = leftRow.children[index];
+                        const rightCell = rightRow.children[index];
+                        const leftValue = parseCellValue(leftCell, type);
+                        const rightValue = parseCellValue(rightCell, type);
+
+                        if (leftValue < rightValue) return -1 * direction;
+                        if (leftValue > rightValue) return 1 * direction;
+                        return 0;
+                    });
+
+                    rows.forEach((row) => tbody.appendChild(row));
+                    sortState = { index, direction };
+                    updateIndicators(index, direction);
+                });
+            });
+        });
+    </script>
 {% else %}
     <div class="empty-state">
         <p>You haven't added any stocks yet.</p>

@@ -179,6 +179,58 @@ a:hover {
     margin-bottom: var(--spacing-lg);
 }
 
+/* --------------------------------------------
+   WEALTH
+   -------------------------------------------- */
+.wealth-page h2 {
+    margin-bottom: var(--spacing-lg);
+}
+
+.wealth-layout {
+    grid-template-columns: 2fr 1fr;
+}
+
+.wealth-metrics {
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Asset allocation breakdown inside the Invested metric card */
+.metric-breakdown {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    margin-top: var(--spacing-sm);
+    font-size: 0.78rem;
+}
+
+.breakdown-stock  { color: var(--color-primary); }
+.breakdown-mf     { color: var(--color-primary-light); }
+.breakdown-ppf    { color: #e6a817; }
+.breakdown-gold   { color: #b8860b; }
+.breakdown-silver { color: #708090; }
+
+/* Wealth table action column */
+.ppf-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    white-space: nowrap;
+}
+
+/* Wide modal variant for transaction history */
+.modal-wide {
+    max-width: 640px;
+}
+
+/* Muted cell text (allocation %) */
+.text-muted {
+    color: var(--color-text-muted);
+}
+
+/* Wealth table doesn't need to overflow-scroll on large screens */
+.wealth-table {
+    width: 100%;
+}
+
 /* Metrics Row */
 .metrics-row {
     display: grid;
@@ -703,6 +755,10 @@ hr {
     }
     
     .content-row {
+        grid-template-columns: 1fr;
+    }
+
+    .wealth-layout {
         grid-template-columns: 1fr;
     }
 }
