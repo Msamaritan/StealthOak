@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,6 +23,11 @@
                     </a>
                 </li>
                 <li>
+                    <a href="/wealth" class="{% if '/wealth' in request.url.path %}active{% endif %}">
+                        🏦 Wealth
+                    </a>
+                </li>
+                <li>
                     <a href="/stocks" class="{% if '/stocks' in request.url.path %}active{% endif %}">
                         📈 Stocks
                     </a>
@@ -32,10 +37,15 @@
                         💼 Mutual Funds
                     </a>
                 </li>
+                <li>
+                    <a href="/moneyflow" class="nav-item {% if '/moneyflow' in request.url.path %}active{% endif %}">
+                        💸 Money Flow
+                    </a>
+                </li>
             </ul>
             
             <div class="sidebar-footer">
-                <p>Phase 0 - MVP</p>
+                <p>User: dataDevil</p>
             </div>
         </nav>
         

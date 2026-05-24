@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     # Max seconds to wait for external API response
     api_timeout: int = 10
     
+    # --- Corporate Proxy (for AMFI/Yahoo Finance behind corporate firewall) ---
+    # Set these env vars if behind a corporate proxy:
+    # Example: STEALTHOAK_HTTP_PROXY="http://proxy.company.com:8080"
+    # httpx will also check http_proxy, https_proxy, no_proxy env vars
+    http_proxy: str = ""
+    https_proxy: str = ""
+    no_proxy: str = ""
+    
     kite_api_key: str = ""
     kite_api_secret: str = ""
     kite_disable_ssl: bool = False

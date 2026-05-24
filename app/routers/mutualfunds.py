@@ -4,7 +4,7 @@
 
 from typing import List
 
-from fastapi import APIRouter, Depends, Request, HTTPException, status
+from fastapi import APIRouter, Depends, Request, HTTPException, status, Body
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -346,3 +346,61 @@ async def get_mf_nav(holding_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=503, detail="Unable to fetch NAV")
     
     return nav_data
+
+
+@router.post("/api/{holding_id}/resolve-scheme")
+async def resolve_mf_scheme_manually(
+    holding_id: int,
+    scheme_code: str = Body(..., embed=True),
+    scheme_name: str = Body(..., embed=True),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Manually resolve an unresolved MF holding by setting correct scheme code.
+    Used when AMFI mapping did not auto-resolve.
+    """
+    result = await db.execute(
+        select(Holding).where(
+            Holding.id == holding_id,
+            Holding.asset_type == "mutual_fund"
+        )
+    )
+    holding = result.scalar_one_or_none()
+    
+    if not holding:
+        raise HTTPException(status_code=404, detail="Mutual fund not found")
+    
+    if not scheme_code or not scheme_code.strip().isdigit():
+        raise HTTPException(status_code=400, detail="Invalid scheme code")
+
+    # Preserve ISIN: if the current symbol is an ISIN (non-numeric), save it as isin before overwriting
+    if holding.symbol and not holding.symbol.strip().isdigit():
+        holding.isin = holding.symbol.strip()
+
+    holding.symbol = scheme_code.strip()
+    if scheme_name:
+        holding.name = scheme_name.strip()
+    
+    await db.commit()
+    
+    return {
+        "message": "Scheme code resolved successfully",
+        "id": holding.id,
+        "scheme_code": holding.symbol,
+        "scheme_name": holding.name,
+    }
+
+
+@router.get("/api/search")
+async def search_mf_schemes(q: str):
+    """
+    Search for mutual fund schemes by name from mfapi.
+    """
+    if len(q.strip()) < 3:
+        return []
+    
+    try:
+        schemes = await price_fetcher.search_mf_schemes(q)
+        return schemes
+    except Exception:
+        return []
