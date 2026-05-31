@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Mutual Funds - StealthOak{% endblock %}
+{% block title %}Indian Mutual Funds - StealthOak{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>My Mutual Funds</h2>
-    <div style="display: flex; gap: 0.5rem;">
+    <div>
+        <h2>Indian Mutual Funds</h2>
+        <p class="market-page-subtitle">Live NAV tracking and holdings for the Indian market.</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <a href="/mutualfunds" class="btn btn-secondary">Market selection</a>
         <a href="/kite/sync/mutualfunds" class="btn btn-secondary">Sync from Coin</a>
+        <button id="deleteAllMFBtn" class="btn btn-danger" type="button">Delete All</button>
         <a href="/kite/refresh-amfi-master" class="btn btn-secondary" title="Refresh AMFI master data">🔄 Refresh AMFI</a>
         <a href="/mutualfunds/add" class="btn btn-primary">+ Add Fund</a>
     </div>
@@ -74,18 +79,18 @@
                 </td>
                 <td>{{ mf.symbol }}</td>
                 <td>{{ "{:.4f}".format(mf.quantity) }}</td>
-                <td>₹{{ "{:.4f}".format(mf.avg_price) }}</td>
+                <td>{{ mf.avg_price|format_currency('INR', 4) }}</td>
                 <td>
                     {% if mf.current_price %}
-                        ₹{{ "{:.4f}".format(mf.current_price) }}
+                        {{ mf.current_price|format_currency('INR', 4) }}
                     {% else %}
                         <span class="unavailable">Unavailable</span>
                     {% endif %}
                 </td>
-                <td>₹{{ "{:,.2f}".format(mf.invested_value) }}</td>
+                <td>{{ mf.invested_value|format_currency('INR') }}</td>
                 <td>
                     {% if mf.current_value %}
-                        ₹{{ "{:,.2f}".format(mf.current_value) }}
+                        {{ mf.current_value|format_currency('INR') }}
                     {% else %}
                         --
                     {% endif %}
@@ -255,6 +260,30 @@
     let mfToDelete = null;
     let mfToResolve = null;
     let resolveSearchTimeout = null;
+
+    const deleteAllMFBtn = document.getElementById('deleteAllMFBtn');
+    if (deleteAllMFBtn) {
+        deleteAllMFBtn.onclick = async function() {
+            const confirmed = window.confirm('Delete all mutual funds from holdings? This cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/mutualfunds/api', {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete all mutual funds');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+    }
 
     // Attach click handlers to all delete buttons
     document.querySelectorAll('.delete-btn').forEach(function(btn) {

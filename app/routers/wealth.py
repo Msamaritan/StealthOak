@@ -14,11 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import Holding, PPFBalance, PPFTransaction
 from app.services.portfolio_stats import portfolio_stats
+from app.utils import get_configured_templates
+
 
 
 router = APIRouter(prefix="/wealth", tags=["Wealth"])
 
-templates = Jinja2Templates(directory="app/templates")
+templates = get_configured_templates()
 
 # ETF symbols that should appear as Gold / Silver rows on the Wealth page
 # rather than being lumped into the Stocks bucket. Add more as needed.

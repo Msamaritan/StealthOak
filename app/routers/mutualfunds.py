@@ -15,11 +15,81 @@ from app.models import Holding, Portfolio
 from app.schemas import HoldingCreate
 from app.services.price_fetcher import price_fetcher
 from app.services.portfolio_stats import portfolio_stats
+from app.utils import get_configured_templates
+
 
 
 router = APIRouter(prefix="/mutualfunds", tags=["Mutual Funds"])
 
-templates = Jinja2Templates(directory="app/templates")
+templates = get_configured_templates()
+
+
+def _mutual_fund_market_cards() -> List[dict]:
+    return [
+        {
+            "theme": "india",
+            "title": "Indian Market",
+            "picture_label": "Indian Market",
+            "image_url": "/static/images/indian_market.jpg",
+            "description": "Track AMFI schemes, live NAVs, and the holdings you already manage.",
+            "cta": "Open Indian Mutual Funds",
+            "href": "/mutualfunds/india",
+        },
+        {
+            "theme": "foreign",
+            "title": "Foreign Market",
+            "picture_label": "Foreign Market",
+            "image_url": "/static/images/foreign_market.jpg",
+            "description": "A separate view for international funds, ETFs, and future cross-border support.",
+            "cta": "Open Foreign Funds",
+            "href": "/mutualfunds/foreign",
+        },
+    ]
+
+
+def _render_market_selector(request: Request):
+    return templates.TemplateResponse(
+        "market_selector.html",
+        {
+            "request": request,
+            "page_title": "Mutual Fund Markets",
+            "heading": "Mutual Funds",
+            "description": "Choose the market you want to manage.",
+            "cards": _mutual_fund_market_cards(),
+        },
+    )
+
+
+def _render_foreign_market_page(request: Request):
+    return templates.TemplateResponse(
+        "market_placeholder.html",
+        {
+            "request": request,
+            "page_title": "Foreign Mutual Funds",
+            "heading": "Foreign Mutual Funds",
+            "description": "Template-only view for overseas fund holdings.",
+            "back_url": "/mutualfunds",
+            "placeholder_title": "Foreign fund page scaffolded",
+            "placeholder_copy": "This page is ready for future foreign fund data, NAV fetching, and ETF support.",
+            "features": [
+                {
+                    "label": "Funds",
+                    "title": "International schemes",
+                    "copy": "A dedicated holdings table can live here once foreign fund sources are wired up.",
+                },
+                {
+                    "label": "ETFs",
+                    "title": "Foreign ETFs",
+                    "copy": "These can share the same layout as funds while keeping the market split clear.",
+                },
+                {
+                    "label": "Watchlists",
+                    "title": "Future expansion",
+                    "copy": "You can extend the same market split when you add other overseas instruments.",
+                },
+            ],
+        },
+    )
 
 
 # ----------------------------------------
@@ -27,13 +97,18 @@ templates = Jinja2Templates(directory="app/templates")
 # ----------------------------------------
 
 @router.get("", response_class=HTMLResponse)
-async def mutualfunds_list_page(
+async def mutualfunds_market_page(request: Request):
+    """Mutual funds market landing page."""
+    return _render_market_selector(request)
+
+
+@router.get("/india", response_class=HTMLResponse)
+@router.get("/indian", response_class=HTMLResponse)
+async def indian_mutualfunds_page(
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Mutual funds listing page.
-    """
+    """Indian mutual funds listing page."""
     result = await db.execute(
         select(Holding).where(Holding.asset_type == "mutual_fund")
     )
@@ -50,6 +125,12 @@ async def mutualfunds_list_page(
             "mutual_funds": enriched,
         }
     )
+
+
+@router.get("/foreign", response_class=HTMLResponse)
+async def foreign_mutualfunds_page(request: Request):
+    """Foreign mutual funds landing page placeholder."""
+    return _render_foreign_market_page(request)
 
 
 @router.get("/add", response_class=HTMLResponse)
@@ -142,7 +223,7 @@ async def update_mutualfund_form(
     holding.quantity = quantity
     holding.avg_price = avg_price
     
-    return RedirectResponse(url="/mutualfunds", status_code=303)
+    return RedirectResponse(url="/mutualfunds/india", status_code=303)
 
 
 # ----------------------------------------
@@ -294,7 +375,7 @@ async def create_mutualfund_form(
     
     db.add(holding)
     
-    return RedirectResponse(url="/mutualfunds", status_code=303)
+    return RedirectResponse(url="/mutualfunds/india", status_code=303)
 
 
 @router.delete("/api/{holding_id}")
@@ -322,6 +403,28 @@ async def delete_mutualfund(
     await db.delete(holding)
     
     return {"message": "Mutual fund deleted successfully", "id": holding_id}
+
+
+@router.delete("/api")
+async def delete_all_mutualfunds(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete all mutual fund holdings.
+    """
+    result = await db.execute(
+        select(Holding).where(Holding.asset_type == "mutual_fund")
+    )
+    holdings = list(result.scalars().all())
+
+    deleted_count = len(holdings)
+    for holding in holdings:
+        await db.delete(holding)
+
+    return {
+        "message": "All mutual funds deleted successfully",
+        "deleted": deleted_count,
+    }
 
 
 @router.get("/api/{holding_id}/nav")

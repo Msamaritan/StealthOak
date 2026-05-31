@@ -13,12 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import Holding, Portfolio
 from app.services.portfolio_stats import portfolio_stats
+from app.utils import get_configured_templates
+
 
 
 router = APIRouter(tags=["Dashboard"])
 
 # Templates directory
-templates = Jinja2Templates(directory="app/templates")
+templates = get_configured_templates()
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -62,10 +64,24 @@ async def dashboard(
     allocation = portfolio_stats.calculate_asset_allocation(enriched)
     top_holdings = portfolio_stats.get_top_holdings(enriched, limit=5)
     
-    # Separate stocks and mutual funds
-    stocks = [h for h in enriched if h.asset_type == "stock"]
-    mutual_funds = [h for h in enriched if h.asset_type == "mutual_fund"]
-    
+    # Separate stocks and mutual funds — sorted by current value desc for the dashboard cards
+    def _sort_key(h):
+        return h.current_value if h.current_value is not None else h.invested_value or 0
+
+    all_stocks = sorted(
+        [h for h in enriched if h.asset_type == "stock"],
+        key=_sort_key,
+        reverse=True,
+    )
+    all_mutual_funds = sorted(
+        [h for h in enriched if h.asset_type == "mutual_fund"],
+        key=_sort_key,
+        reverse=True,
+    )
+
+    stocks = all_stocks[:5]
+    mutual_funds = all_mutual_funds[:5]
+
     return templates.TemplateResponse(
         "dashboard.html",
         {

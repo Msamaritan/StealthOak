@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}StealthOak{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260531a">
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -42,6 +42,11 @@
                         💸 Money Flow
                     </a>
                 </li>
+                <li>
+                    <a href="/insurance" class="nav-item {% if '/insurance' in request.url.path %}active{% endif %}">
+                        🛡️ Insurance
+                    </a>
+                </li>
             </ul>
             
             <div class="sidebar-footer">
@@ -54,6 +59,9 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+    
+    <!-- Global formatting utilities for all pages -->
+    <script src="/static/js/formatting.js?v=20260524b"></script>
     
     {% block extra_scripts %}{% endblock %}
 </body>

@@ -60,7 +60,7 @@ class KiteService:
                 request_token=request_token,
                 api_secret=self.api_secret
             )
-            self.kite.set_access_token(session["access_token"])
+            self.set_access_token(session["access_token"])
             logger.info(f"Session generated for user: {session.get('user_id')}")
             return session
         except Exception as e:

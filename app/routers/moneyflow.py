@@ -48,6 +48,9 @@ from config import settings
 from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory="app/templates")
+from app.utils import get_configured_templates
+
+templates = get_configured_templates()
 
 
 WEEKDAY_NAMES = {
@@ -104,7 +107,9 @@ def _is_sip_due(sip: ActiveSIP, execution_date: dt.date) -> bool:
         if not sip.execution_dates:
             return False
         dates_list = [int(d.strip()) for d in sip.execution_dates.split(',') if d.strip()]
-        if adjusted_execution_date.day not in dates_list:
+        # Match against configured calendar dates; weekend shift only changes
+        # execution day, not the configured date bucket.
+        if execution_date.day not in dates_list:
             return False
         # Check if already executed this month
         if sip.last_executed_on and sip.last_executed_on.year == execution_date.year and sip.last_executed_on.month == execution_date.month:
@@ -281,9 +286,9 @@ async def moneyflow_page(
         "summary": summary,
         "available_months": available_months,
         "selected_month": month,
-        "banks": ["SBI", "HDFC", "ICICI"],  # Configurable later
-        "brokers": ["Zerodha", "Kite", "Coin"],
-        "savings": ["PPF", "NPS", "EPF"],
+        "banks": ["SBI", "S-Pankki", "ICICI"],  # Configurable later
+        "brokers": ["Zerodha", "IBKR", "Kite", "Coin"],
+        "savings": ["PPF", "NPS"],
         "zerodha_sips": zerodha_sips,
         "coin_sips": coin_sips,
         "active_sip_brokers": active_sip_brokers,
@@ -534,8 +539,11 @@ async def run_coin_sips(
     if not bank_transfer:
         raise HTTPException(status_code=404, detail="Bank transfer not found")
 
-    if not (month_start <= bank_transfer.date < month_end):
-        raise HTTPException(status_code=400, detail="Selected bank transfer is not in the selected SIP month")
+    if bank_transfer.date >= month_end:
+        raise HTTPException(
+            status_code=400,
+            detail="Selected bank transfer must be from the selected SIP month or an earlier month"
+        )
 
     # CHECK FOR DUPLICATE RUN: Detect if this month's SIPs were already executed
     result = await session.execute(
@@ -688,8 +696,11 @@ async def run_zerodha_sips(
     if not broker_credit:
         raise HTTPException(status_code=404, detail="Broker credit not found")
 
-    if not (month_start <= broker_credit.date < month_end):
-        raise HTTPException(status_code=400, detail="Selected broker credit is not in the selected SIP month")
+    if broker_credit.date >= month_end:
+        raise HTTPException(
+            status_code=400,
+            detail="Selected broker credit must be from the selected SIP month or an earlier month"
+        )
 
     # CHECK FOR DUPLICATE RUN: Detect if Zerodha SIPs were already executed for this month
     result = await session.execute(
@@ -840,7 +851,8 @@ async def create_bank_transfer(
 async def list_bank_transfers(
     session: AsyncSession = Depends(get_db),
     with_idle_only: bool = Query(default=False, description="Only show transfers with idle amount"),
-    month: Optional[str] = Query(default=None, description="Filter by month: YYYY-MM")
+    month: Optional[str] = Query(default=None, description="Filter by month: YYYY-MM"),
+    include_previous_months: bool = Query(default=False, description="When month is provided, include all transfers before that month's end")
 ):
     """List all bank transfers"""
     query = (
@@ -854,7 +866,10 @@ async def list_bank_transfers(
             year, mon = map(int, month.split("-"))
             start = dt.date(year, mon, 1)
             end = dt.date(year + 1, 1, 1) if mon == 12 else dt.date(year, mon + 1, 1)
-            query = query.where(BankTransfer.date >= start, BankTransfer.date < end)
+            if include_previous_months:
+                query = query.where(BankTransfer.date < end)
+            else:
+                query = query.where(BankTransfer.date >= start, BankTransfer.date < end)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid month format. Use YYYY-MM")
 
@@ -1040,7 +1055,8 @@ async def list_broker_credits(
     with_idle_only: bool = Query(default=False, description="Only show credits with idle amount"),
     destination_type: Optional[str] = Query(default=None, description="Filter by type: broker or savings"),
     month: Optional[str] = Query(default=None, description="Filter by month (YYYY-MM format)"),
-    broker: Optional[str] = Query(default=None, description="Filter by broker destination (Zerodha, Coin, etc.)")
+    broker: Optional[str] = Query(default=None, description="Filter by broker destination (Zerodha, Coin, etc.)"),
+    include_previous_months: bool = Query(default=False, description="When month is provided, include all broker credits before that month's end")
 ):
     """List all broker credits"""
     query = (
@@ -1060,7 +1076,10 @@ async def list_broker_credits(
             year, month_num = map(int, month.split("-"))
             month_start = dt.date(year, month_num, 1)
             month_end = dt.date(year + 1, 1, 1) if month_num == 12 else dt.date(year, month_num + 1, 1)
-            query = query.where(BrokerCredit.date >= month_start, BrokerCredit.date < month_end)
+            if include_previous_months:
+                query = query.where(BrokerCredit.date < month_end)
+            else:
+                query = query.where(BrokerCredit.date >= month_start, BrokerCredit.date < month_end)
         except (ValueError, IndexError):
             pass  # Ignore invalid month format
     

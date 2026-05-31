@@ -12,9 +12,9 @@
             <span class="metric-label">Total Invested</span>
             <span class="metric-value">
                 {% if summary %}
-                    ₹{{ "{:,.2f}".format(summary.total_invested) }}
+                    {{ summary.total_invested|format_currency('INR') }}
                 {% else %}
-                    ₹0.00
+                    {{ 0|format_currency('INR') }}
                 {% endif %}
             </span>
         </div>
@@ -23,9 +23,9 @@
             <span class="metric-label">Current Value</span>
             <span class="metric-value">
                 {% if summary %}
-                    ₹{{ "{:,.2f}".format(summary.total_current_value) }}
+                    {{ summary.total_current_value|format_currency('INR') }}
                 {% else %}
-                    ₹0.00
+                    {{ 0|format_currency('INR') }}
                 {% endif %}
             </span>
         </div>
@@ -34,11 +34,11 @@
             <span class="metric-label">Total P&L</span>
             {% if summary %}
                 <span class="metric-value {% if summary.total_pnl >= 0 %}profit{% else %}loss{% endif %}">
-                    {% if summary.total_pnl >= 0 %}+{% endif %}₹{{ "{:,.2f}".format(summary.total_pnl) }}
+                    {% if summary.total_pnl >= 0 %}+{% endif %}{{ summary.total_pnl|format_currency('INR') }}
                     <small>({{ "{:+.2f}".format(summary.total_pnl_percent) }}%)</small>
                 </span>
             {% else %}
-                <span class="metric-value">₹0.00</span>
+                <span class="metric-value">{{ 0|format_currency('INR') }}</span>
             {% endif %}
         </div>
     </div>
@@ -76,7 +76,7 @@
                     <li>
                         <span class="holding-name">{{ holding.name }}</span>
                         <span class="holding-value">
-                            ₹{{ "{:,.2f}".format(holding.current_value or holding.invested_value) }}
+                            {{ (holding.current_value or holding.invested_value)|format_currency('INR') }}
                         </span>
                     </li>
                     {% endfor %}
@@ -89,8 +89,11 @@
         <!-- Stocks Table -->
         <div class="content-card">
             <div class="card-header">
-                <h3>Stocks</h3>
-                <a href="/stocks/add" class="btn btn-small">+ Add</a>
+                <h3>Stocks <span class="dashboard-top-badge">Top 5</span></h3>
+                <div style="display:flex;gap:0.4rem;align-items:center;">
+                    <a href="/stocks/india" class="btn btn-small btn-secondary">View all</a>
+                    <a href="/stocks/add" class="btn btn-small">+ Add</a>
+                </div>
             </div>
             {% if stocks %}
                 <table class="holdings-table">
@@ -112,7 +115,7 @@
                             <td>{{ stock.quantity }}</td>
                             <td>
                                 {% if stock.current_price %}
-                                    ₹{{ "{:,.2f}".format(stock.current_price) }}
+                                    {{ stock.current_price|format_currency('INR') }}
                                 {% else %}
                                     <span class="unavailable">--</span>
                                 {% endif %}
@@ -136,8 +139,11 @@
         <!-- Mutual Funds Table -->
         <div class="content-card">
             <div class="card-header">
-                <h3>Mutual Funds</h3>
-                <a href="/mutualfunds/add" class="btn btn-small">+ Add</a>
+                <h3>Mutual Funds <span class="dashboard-top-badge">Top 5</span></h3>
+                <div style="display:flex;gap:0.4rem;align-items:center;">
+                    <a href="/mutualfunds/india" class="btn btn-small btn-secondary">View all</a>
+                    <a href="/mutualfunds/add" class="btn btn-small">+ Add</a>
+                </div>
             </div>
             {% if mutual_funds %}
                 <table class="holdings-table">
@@ -158,7 +164,7 @@
                             <td>{{ "{:.2f}".format(mf.quantity) }}</td>
                             <td>
                                 {% if mf.current_price %}
-                                    ₹{{ "{:.4f}".format(mf.current_price) }}
+                                    {{ mf.current_price|format_currency('INR', 4) }}
                                 {% else %}
                                     <span class="unavailable">--</span>
                                 {% endif %}

@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Stocks - StealthOak{% endblock %}
+{% block title %}Indian Stocks - StealthOak{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>My Stocks</h2>
-    <div style="display: flex; gap: 0.5rem;">
+    <div>
+        <h2>Indian Stocks</h2>
+        <p class="market-page-subtitle">Live holdings and prices for the Indian market.</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <a href="/stocks" class="btn btn-secondary">Market selection</a>
         <a href="/kite/sync/stocks" class="btn btn-secondary">Sync from Kite</a>
+        <button id="deleteAllStocksBtn" class="btn btn-danger" type="button">Delete All</button>
         <a href="/stocks/add" class="btn btn-primary">+ Add Stock</a>
     </div>
 </div>
@@ -72,18 +77,18 @@
                     <small class="exchange-badge">{{ stock.exchange or '-' }}</small>
                 </td>
                 <td>{{ stock.quantity }}</td>
-                <td>₹{{ "{:,.2f}".format(stock.avg_price) }}</td>
+                <td>{{ stock.avg_price|format_currency('INR') }}</td>
                 <td>
                     {% if stock.current_price %}
-                        ₹{{ "{:,.2f}".format(stock.current_price) }}
+                        {{ stock.current_price|format_currency('INR') }}
                     {% else %}
                         <span class="unavailable">Unavailable</span>
                     {% endif %}
                 </td>
-                <td>₹{{ "{:,.2f}".format(stock.invested_value) }}</td>
+                <td>{{ stock.invested_value|format_currency('INR') }}</td>
                 <td>
                     {% if stock.current_value %}
-                        ₹{{ "{:,.2f}".format(stock.current_value) }}
+                        {{ stock.current_value|format_currency('INR') }}
                     {% else %}
                         --
                     {% endif %}
@@ -201,6 +206,30 @@
 {% block extra_scripts %}
 <script>
     let stockToDelete = null;
+
+    const deleteAllStocksBtn = document.getElementById('deleteAllStocksBtn');
+    if (deleteAllStocksBtn) {
+        deleteAllStocksBtn.onclick = async function() {
+            const confirmed = window.confirm('Delete all stocks from holdings? This cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/stocks/api', {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete all stocks');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+    }
     
     // Attach click handlers to all delete buttons
     document.querySelectorAll('.delete-btn').forEach(function(btn) {

@@ -43,11 +43,11 @@
                         <div class="card-date">{{ bt.date.strftime('%d %b %Y') }}</div>
                         <div class="card-details">
                             <span class="card-source">{{ bt.source_bank }}</span>
-                            <span class="card-amount">₹{{ "{:,.2f}".format(bt.amount) }}</span>
+                            <span class="card-amount">{{ bt.amount|format_currency('INR') }}</span>
                         </div>
                         {% if bt.idle_amount > 0 %}
                         <div class="card-status status-idle">
-                            <span class="idle-amount">₹{{ "{:,.2f}".format(bt.idle_amount) }} idle</span>
+                            <span class="idle-amount">{{ bt.idle_amount|format_currency('INR') }} idle</span>
                         </div>
                         {% else %}
                         <div class="card-status status-done">
@@ -55,7 +55,7 @@
                         </div>
                         {% endif %}
                         {% if bt.notes %}
-                        <div class="card-notes">{{ bt.notes }}</div>
+                        <div class="card-notes" data-notes="{{ bt.notes }}">{{ bt.notes }}</div>
                         {% endif %}
                         <div class="card-actions">
                             {% if bt.idle_amount > 0 %}
@@ -105,7 +105,7 @@
                         <div class="card-date">{{ bc.date.strftime('%d %b %Y') }}</div>
                         <div class="card-details">
                             <span class="card-source">→ {{ bc.destination }}</span>
-                            <span class="card-amount">₹{{ "{:,.2f}".format(bc.amount) }}</span>
+                            <span class="card-amount">{{ bc.amount|format_currency('INR') }}</span>
                         </div>
                         {% if bc.destination_type == 'savings' %}
                         <div class="card-status status-done">
@@ -113,7 +113,7 @@
                         </div>
                         {% elif bc.idle_amount > 0 %}
                         <div class="card-status status-idle">
-                            <span class="idle-amount">₹{{ "{:,.2f}".format(bc.idle_amount) }} idle</span>
+                            <span class="idle-amount">{{ bc.idle_amount|format_currency('INR') }} idle</span>
                         </div>
                         {% else %}
                         <div class="card-status status-done">
@@ -121,7 +121,7 @@
                         </div>
                         {% endif %}
                         {% if bc.notes %}
-                        <div class="card-notes">{{ bc.notes }}</div>
+                        <div class="card-notes" data-notes="{{ bc.notes }}">{{ bc.notes }}</div>
                         {% endif %}
                         <div class="card-actions">
                             {% if bc.idle_amount > 0 %}
@@ -177,7 +177,7 @@
                         <div class="card-date">{{ inv.date.strftime('%d %b %Y') }}</div>
                         <div class="card-details">
                             <span class="card-source">{{ inv.holding_name }}</span>
-                            <span class="card-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
+                            <span class="card-amount">{{ inv.amount|format_currency('INR') }}</span>
                         </div>
                         {% if inv.notes %}
                         <div class="card-notes" data-notes="{{ inv.notes }}">
@@ -207,25 +207,25 @@
         <div class="summary-flow">
             <div class="summary-item">
                 <span class="summary-label">🏦 Bank</span>
-                <span class="summary-value">₹{{ "{:,.2f}".format(summary.total_bank_transfers) }}</span>
+                <span class="summary-value">{{ summary.total_bank_transfers|format_currency('INR') }}</span>
             </div>
             <span class="summary-arrow">→</span>
             <div class="summary-item">
                 <span class="summary-label">💳 Broker</span>
-                <span class="summary-value">₹{{ "{:,.2f}".format(summary.total_broker_credits) }}</span>
+                <span class="summary-value">{{ summary.total_broker_credits|format_currency('INR') }}</span>
             </div>
             <span class="summary-arrow">→</span>
             <div class="summary-item">
                 <span class="summary-label">📈 Invested</span>
-                <span class="summary-value">₹{{ "{:,.2f}".format(summary.total_invested) }}</span>
+                <span class="summary-value">{{ summary.total_invested|format_currency('INR') }}</span>
             </div>
         </div>
         <div class="summary-idle">
             <span class="idle-label">Idle at Bank:</span>
-            <span class="idle-value">₹{{ "{:,.2f}".format(summary.idle_at_bank) }}</span>
+            <span class="idle-value">{{ summary.idle_at_bank|format_currency('INR') }}</span>
             <span class="idle-separator">|</span>
             <span class="idle-label">Idle at Broker:</span>
-            <span class="idle-value">₹{{ "{:,.2f}".format(summary.idle_at_broker) }}</span>
+            <span class="idle-value">{{ summary.idle_at_broker|format_currency('INR') }}</span>
         </div>
     </div>
 
@@ -244,8 +244,8 @@
                     <div class="breakdown-item">
                         <span class="breakdown-source">{{ item.source }} - {{ item.date.strftime('%d %b %Y') }}</span>
                         <span class="breakdown-amounts">
-                            <span class="total">₹{{ "{:,.2f}".format(item.total_amount) }}</span>
-                            <span class="idle">₹{{ "{:,.2f}".format(item.idle_amount) }} idle</span>
+                            <span class="total">{{ item.total_amount|format_currency('INR') }}</span>
+                            <span class="idle">{{ item.idle_amount|format_currency('INR') }} idle</span>
                         </span>
                     </div>
                     {% endfor %}
@@ -260,8 +260,8 @@
                     <div class="breakdown-item">
                         <span class="breakdown-source">{{ item.source }} - {{ item.date.strftime('%d %b %Y') }}</span>
                         <span class="breakdown-amounts">
-                            <span class="total">₹{{ "{:,.2f}".format(item.total_amount) }}</span>
-                            <span class="idle">₹{{ "{:,.2f}".format(item.idle_amount) }} idle</span>
+                            <span class="total">{{ item.total_amount|format_currency('INR') }}</span>
+                            <span class="idle">{{ item.idle_amount|format_currency('INR') }} idle</span>
                         </span>
                     </div>
                     {% endfor %}
@@ -298,7 +298,7 @@
                                 </small>
                             </span>
                             <span class="breakdown-amounts">
-                                <span class="idle">₹{{ "{:,.2f}".format(sip.amount) }}</span>
+                                <span class="idle">{{ sip.amount|format_currency('INR') }}</span>
                                 <div class="sip-actions">
                                     <button class="btn-sip-action btn-edit" data-sip-id="{{ sip.id }}" data-broker-name="{{ sip.broker_name }}" data-holding-name="{{ sip.holding_name }}" data-frequency="{{ sip.frequency }}" data-weekday="{{ sip.weekday or '' }}" data-monthly-day="{{ sip.monthly_day or '' }}" data-execution-dates="{{ sip.execution_dates or '' }}" data-amount="{{ sip.amount }}" data-notes="{{ sip.notes or '' }}" onclick="openEditSIPFromButton(this)" title="Edit SIP">✎</button>
                                     <button class="btn-sip-action btn-delete" data-sip-id="{{ sip.id }}" onclick="deleteSIPFromButton(this)" title="Delete SIP">×</button>
@@ -330,7 +330,7 @@
                                 </small>
                             </span>
                             <span class="breakdown-amounts">
-                                <span class="idle">₹{{ "{:,.2f}".format(sip.amount) }}</span>
+                                <span class="idle">{{ sip.amount|format_currency('INR') }}</span>
                                 <div class="sip-actions">
                                     <button class="btn-sip-action btn-edit" data-sip-id="{{ sip.id }}" data-broker-name="{{ sip.broker_name }}" data-holding-name="{{ sip.holding_name }}" data-frequency="{{ sip.frequency }}" data-weekday="{{ sip.weekday or '' }}" data-monthly-day="{{ sip.monthly_day or '' }}" data-execution-dates="{{ sip.execution_dates or '' }}" data-amount="{{ sip.amount }}" data-notes="{{ sip.notes or '' }}" onclick="openEditSIPFromButton(this)" title="Edit SIP">✎</button>
                                     <button class="btn-sip-action btn-delete" data-sip-id="{{ sip.id }}" onclick="deleteSIPFromButton(this)" title="Delete SIP">×</button>
@@ -482,7 +482,7 @@
             </div>
             <div class="form-group">
                 <label for="bankSource">Bank</label>
-                <select id="bankSource" required>
+                <select id="bankSource" required onchange="updateBankCurrencyDefaults()">
                     <option value="">Select Bank</option>
                     {% for bank in banks %}
                     <option value="{{ bank }}">{{ bank }}</option>
@@ -490,7 +490,18 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="bankAmount">Amount (₹)</label>
+                <label for="bankCurrency">Currency</label>
+                <select id="bankCurrency" onchange="updateBankCurrencyDefaults()">
+                    <option value="INR">INR (₹)</option>
+                    <option value="EUR">EUR (€)</option>
+                </select>
+            </div>
+            <div class="form-group" id="bankFxRateGroup" style="display: none;">
+                <label for="bankFxRate">EUR to INR rate</label>
+                <input type="number" id="bankFxRate" placeholder="95.00" min="0.0001" step="0.0001" oninput="updateBankCurrencyDefaults()">
+            </div>
+            <div class="form-group">
+                <label for="bankAmount" id="bankAmountLabel">Amount (₹)</label>
                 <input type="number" id="bankAmount" placeholder="50000.00" min="0.01" step="0.01" required>
             </div>
             <div class="form-group">
@@ -518,6 +529,7 @@
         </div>
         <form id="allocateForm" onsubmit="saveAllocate(event)">
             <input type="hidden" id="allocateBankId" value="">
+            <input type="hidden" id="allocateSourceBank" value="">
             <input type="hidden" id="allocateMaxAmount" value="0">
             <div class="form-group">
                 <label for="allocateDate">Date</label>
@@ -525,7 +537,7 @@
             </div>
             <div class="form-group">
                 <label for="allocateDestination">Destination</label>
-                <select id="allocateDestination" required onchange="updateDestinationType()">
+                <select id="allocateDestination" required onchange="updateDestinationType(); updateAllocateCurrencyDefaults();">
                     <option value="">Select Destination</option>
                     <optgroup label="Brokers">
                         {% for broker in brokers %}
@@ -541,7 +553,18 @@
             </div>
             <input type="hidden" id="allocateDestinationType" value="broker">
             <div class="form-group">
-                <label for="allocateAmount">Amount (₹)</label>
+                <label for="allocateCurrency">Currency</label>
+                <select id="allocateCurrency" onchange="updateAllocateCurrencyDefaults()">
+                    <option value="INR">INR (₹)</option>
+                    <option value="EUR">EUR (€)</option>
+                </select>
+            </div>
+            <div class="form-group" id="allocateFxRateGroup" style="display: none;">
+                <label for="allocateFxRate">EUR to INR rate</label>
+                <input type="number" id="allocateFxRate" placeholder="95.00" min="0.0001" step="0.0001" oninput="updateAllocateRemaining()">
+            </div>
+            <div class="form-group">
+                <label for="allocateAmount" id="allocateAmountLabel">Amount (₹)</label>
                 <input type="number" id="allocateAmount" placeholder="40000" min="1" required oninput="updateAllocateRemaining()">
             </div>
             <div class="form-remaining">
@@ -570,12 +593,12 @@
             <input type="hidden" id="brokerEditId" value="">
             <div class="form-group">
                 <label for="brokerBankTransfer">From Bank Transfer</label>
-                <select id="brokerBankTransfer" required>
+                <select id="brokerBankTransfer" required onchange="updateBrokerCurrencyDefaults()">
                     <option value="">Select Bank Transfer</option>
                     {% for bt in bank_transfers %}
                         {% if bt.idle_amount > 0 %}
-                        <option value="{{ bt.id }}" data-idle="{{ bt.idle_amount }}">
-                            {{ bt.source_bank }} - {{ bt.date.strftime('%d %b %Y') }} (₹{{ "{:,.2f}".format(bt.idle_amount) }} available)
+                        <option value="{{ bt.id }}" data-idle="{{ bt.idle_amount }}" data-source-bank="{{ bt.source_bank }}">
+                            {{ bt.source_bank }} - {{ bt.date.strftime('%d %b %Y') }} ({{ bt.idle_amount|format_currency('INR') }} available)
                         </option>
                         {% endif %}
                     {% endfor %}
@@ -587,7 +610,7 @@
             </div>
             <div class="form-group">
                 <label for="brokerDestination">Destination</label>
-                <select id="brokerDestination" required onchange="updateBrokerDestinationType()">
+                <select id="brokerDestination" required onchange="updateBrokerDestinationType(); updateBrokerCurrencyDefaults();">
                     <option value="">Select Destination</option>
                     <optgroup label="Brokers">
                         {% for broker in brokers %}
@@ -603,7 +626,18 @@
             </div>
             <input type="hidden" id="brokerDestinationType" value="broker">
             <div class="form-group">
-                <label for="brokerAmount">Amount (₹)</label>
+                <label for="brokerCurrency">Currency</label>
+                <select id="brokerCurrency" onchange="updateBrokerCurrencyDefaults()">
+                    <option value="INR">INR (₹)</option>
+                    <option value="EUR">EUR (€)</option>
+                </select>
+            </div>
+            <div class="form-group" id="brokerFxRateGroup" style="display: none;">
+                <label for="brokerFxRate">EUR to INR rate</label>
+                <input type="number" id="brokerFxRate" placeholder="95.00" min="0.0001" step="0.0001" oninput="updateBrokerCurrencyDefaults()">
+            </div>
+            <div class="form-group">
+                <label for="brokerAmount" id="brokerAmountLabel">Amount (₹)</label>
                 <input type="number" id="brokerAmount" placeholder="40000.00" min="0.01" step="0.01" required>
             </div>
             <div class="form-group">
@@ -631,6 +665,7 @@
         </div>
         <form id="investForm" onsubmit="saveInvest(event)">
             <input type="hidden" id="investBrokerId" value="">
+            <input type="hidden" id="investSourceBroker" value="">
             <input type="hidden" id="investMaxAmount" value="0">
             <input type="hidden" id="investAssetType" value="">
             <input type="hidden" id="investAssetSymbol" value="">
@@ -660,7 +695,18 @@
                 <input type="number" id="investUnits" placeholder="e.g., 10.5" min="0.0001" step="0.0001" oninput="updateAmountFromUnits('invest')">
             </div>
             <div class="form-group">
-                <label for="investAmount">Amount (₹)</label>
+                <label for="investCurrency">Currency</label>
+                <select id="investCurrency" onchange="updateInvestCurrencyDefaults()">
+                    <option value="INR">INR (₹)</option>
+                    <option value="EUR">EUR (€)</option>
+                </select>
+            </div>
+            <div class="form-group" id="investFxRateGroup" style="display: none;">
+                <label for="investFxRate">EUR to INR rate</label>
+                <input type="number" id="investFxRate" placeholder="95.00" min="0.0001" step="0.0001" oninput="updateInvestRemaining()">
+            </div>
+            <div class="form-group">
+                <label for="investAmount" id="investAmountLabel">Amount (₹)</label>
                 <input type="number" id="investAmount" placeholder="15000.50" min="0.01" step="0.01" required oninput="updateInvestRemaining()">
             </div>
             <div class="form-remaining">
@@ -696,12 +742,12 @@
             </div>
             <div class="form-group" id="investmentBrokerCreditGroup">
                 <label for="investmentBrokerCredit">From Broker Credit</label>
-                <select id="investmentBrokerCredit" required>
+                <select id="investmentBrokerCredit" required onchange="updateInvestmentCurrencyDefaults()">
                     <option value="">Select Broker Credit</option>
                     {% for bc in broker_credits %}
                         {% if bc.destination_type == 'broker' and bc.idle_amount > 0 %}
-                        <option value="{{ bc.id }}" data-idle="{{ bc.idle_amount }}">
-                            {{ bc.destination }} - {{ bc.date.strftime('%d %b %Y') }} (₹{{ "{:,.2f}".format(bc.idle_amount) }} available)
+                        <option value="{{ bc.id }}" data-idle="{{ bc.idle_amount }}" data-destination="{{ bc.destination }}">
+                            {{ bc.destination }} - {{ bc.date.strftime('%d %b %Y') }} ({{ bc.idle_amount|format_currency('INR') }} available)
                         </option>
                         {% endif %}
                     {% endfor %}
@@ -709,12 +755,12 @@
             </div>
             <div class="form-group" id="investmentBankTransferGroup" style="display:none;">
                 <label for="investmentBankTransfer">From Bank Transfer</label>
-                <select id="investmentBankTransfer">
+                <select id="investmentBankTransfer" onchange="updateInvestmentCurrencyDefaults()">
                     <option value="">Select Bank Transfer</option>
                     {% for bt in bank_transfers %}
                         {% if bt.idle_amount > 0 %}
-                        <option value="{{ bt.id }}" data-idle="{{ bt.idle_amount }}">
-                            {{ bt.source_bank }} - {{ bt.date.strftime('%d %b %Y') }} (₹{{ "{:,.2f}".format(bt.idle_amount) }} idle)
+                        <option value="{{ bt.id }}" data-idle="{{ bt.idle_amount }}" data-source-bank="{{ bt.source_bank }}">
+                            {{ bt.source_bank }} - {{ bt.date.strftime('%d %b %Y') }} ({{ bt.idle_amount|format_currency('INR') }} idle)
                         </option>
                         {% endif %}
                     {% endfor %}
@@ -748,7 +794,18 @@
                 <input type="number" id="investmentUnits" placeholder="e.g., 10.5" min="0.0001" step="0.0001" oninput="updateAmountFromUnits('investment')">
             </div>
             <div class="form-group">
-                <label for="investmentAmount">Amount (₹)</label>
+                <label for="investmentCurrency">Currency</label>
+                <select id="investmentCurrency" onchange="updateInvestmentCurrencyDefaults()">
+                    <option value="INR">INR (₹)</option>
+                    <option value="EUR">EUR (€)</option>
+                </select>
+            </div>
+            <div class="form-group" id="investmentFxRateGroup" style="display: none;">
+                <label for="investmentFxRate">EUR to INR rate</label>
+                <input type="number" id="investmentFxRate" placeholder="95.00" min="0.0001" step="0.0001" oninput="updateInvestmentCurrencyDefaults()">
+            </div>
+            <div class="form-group">
+                <label for="investmentAmount" id="investmentAmountLabel">Amount (₹)</label>
                 <input type="number" id="investmentAmount" placeholder="15000.50" min="0.01" step="0.01" required>
             </div>
             <div class="form-group">
@@ -1596,6 +1653,89 @@ function formatCurrency(amount) {
     return '₹' + currencyFormatter.format(Number.isFinite(numeric) ? numeric : 0);
 }
 
+function formatEuro(amount) {
+    const numeric = Number(amount);
+    return '€' + currencyFormatter.format(Number.isFinite(numeric) ? numeric : 0);
+}
+
+const FX_TAG_REGEX = /\[\[FX\|([A-Z]{3})\|([0-9.]+)\|([0-9.]+)\]\]/;
+
+function parseFxTag(notes) {
+    const raw = String(notes || '');
+    const match = raw.match(FX_TAG_REGEX);
+    if (!match) {
+        return {
+            currency: 'INR',
+            originalAmount: null,
+            fxRate: null,
+            cleanNotes: raw.trim(),
+        };
+    }
+
+    const currency = match[1] || 'INR';
+    const originalAmount = Number.parseFloat(match[2]);
+    const fxRate = Number.parseFloat(match[3]);
+    const cleanNotes = raw.replace(FX_TAG_REGEX, '').trim();
+
+    return {
+        currency,
+        originalAmount: Number.isFinite(originalAmount) ? originalAmount : null,
+        fxRate: Number.isFinite(fxRate) ? fxRate : null,
+        cleanNotes,
+    };
+}
+
+function buildFxNotes(cleanNotes, currency, originalAmount, fxRate) {
+    const noteText = String(cleanNotes || '').trim();
+    if (currency !== 'EUR') {
+        return noteText || null;
+    }
+
+    const amount = Number.parseFloat(originalAmount);
+    const rate = Number.parseFloat(fxRate);
+    if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(rate) || rate <= 0) {
+        throw new Error('EUR amounts require a valid FX rate.');
+    }
+
+    const fxTag = `[[FX|EUR|${amount.toFixed(4)}|${rate.toFixed(6)}]]`;
+    return noteText ? `${noteText} ${fxTag}` : fxTag;
+}
+
+function convertToInr(amount, currency, fxRate) {
+    const numericAmount = Number.parseFloat(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        return NaN;
+    }
+    if (currency !== 'EUR') {
+        return numericAmount;
+    }
+
+    const rate = Number.parseFloat(fxRate);
+    if (!Number.isFinite(rate) || rate <= 0) {
+        return NaN;
+    }
+    return numericAmount * rate;
+}
+
+function isEuroBank(bankName) {
+    return String(bankName || '').trim().toLowerCase() === 's-pankki';
+}
+
+function isEuroBroker(brokerName) {
+    return String(brokerName || '').trim().toLowerCase() === 'ibkr';
+}
+
+function toggleFxInput(groupId, amountLabelId, currency) {
+    const fxGroup = document.getElementById(groupId);
+    const amountLabel = document.getElementById(amountLabelId);
+    if (fxGroup) {
+        fxGroup.style.display = currency === 'EUR' ? 'block' : 'none';
+    }
+    if (amountLabel) {
+        amountLabel.textContent = currency === 'EUR' ? 'Amount (€)' : 'Amount (₹)';
+    }
+}
+
 function getTodayDate() {
     return new Date().toISOString().split('T')[0];
 }
@@ -1885,6 +2025,9 @@ function openBankModal() {
     document.getElementById('bankModalTitle').textContent = '🏦 New Bank Transfer';
     document.getElementById('bankEditId').value = '';
     document.getElementById('bankDate').value = getTodayDate();
+    document.getElementById('bankCurrency').value = 'INR';
+    document.getElementById('bankFxRate').value = '';
+    updateBankCurrencyDefaults();
     openModal('bank');
 }
 
@@ -1896,10 +2039,14 @@ function openEditBankModal(id) {
     fetch(`${API_BASE}/bank-transfers/${id}`)
         .then(res => res.json())
         .then(data => {
+            const fx = parseFxTag(data.notes || '');
             document.getElementById('bankDate').value = data.date;
             document.getElementById('bankSource').value = data.source_bank;
-            document.getElementById('bankAmount').value = data.amount;
-            document.getElementById('bankNotes').value = data.notes || '';
+            document.getElementById('bankCurrency').value = fx.currency || 'INR';
+            document.getElementById('bankFxRate').value = fx.fxRate || '';
+            document.getElementById('bankAmount').value = fx.currency === 'EUR' && fx.originalAmount ? fx.originalAmount : data.amount;
+            document.getElementById('bankNotes').value = fx.cleanNotes || '';
+            updateBankCurrencyDefaults();
             openModal('bank');
         })
         .catch(err => showError('Failed to load data'));
@@ -1908,12 +2055,16 @@ function openEditBankModal(id) {
 // Allocate Modal (from Bank card)
 function openAllocateModal(bankId, bankName, bankDate, idleAmount) {
     document.getElementById('allocateBankId').value = bankId;
+    document.getElementById('allocateSourceBank').value = bankName;
     document.getElementById('allocateSource').textContent = `${bankName} - ${bankDate}`;
     document.getElementById('allocateAvailable').textContent = formatCurrency(idleAmount);
     document.getElementById('allocateMaxAmount').value = idleAmount;
     document.getElementById('allocateDate').value = getTodayDate();
     document.getElementById('allocateAmount').value = '';
+    document.getElementById('allocateCurrency').value = isEuroBank(bankName) ? 'EUR' : 'INR';
+    document.getElementById('allocateFxRate').value = '';
     document.getElementById('allocateRemaining').textContent = formatCurrency(idleAmount);
+    updateAllocateCurrencyDefaults();
     openModal('allocate');
 }
 
@@ -1931,6 +2082,9 @@ function openBrokerModal() {
     document.getElementById('brokerModalTitle').textContent = '💳 New Broker Credit';
     document.getElementById('brokerEditId').value = '';
     document.getElementById('brokerDate').value = getTodayDate();
+    document.getElementById('brokerCurrency').value = 'INR';
+    document.getElementById('brokerFxRate').value = '';
+    updateBrokerCurrencyDefaults();
     openModal('broker');
 }
 
@@ -1941,12 +2095,16 @@ function openEditBrokerModal(id) {
     fetch(`${API_BASE}/broker-credits/${id}`)
         .then(res => res.json())
         .then(data => {
+            const fx = parseFxTag(data.notes || '');
             document.getElementById('brokerBankTransfer').value = data.bank_transfer_id;
             document.getElementById('brokerDate').value = data.date;
             document.getElementById('brokerDestination').value = data.destination;
             document.getElementById('brokerDestinationType').value = data.destination_type;
-            document.getElementById('brokerAmount').value = data.amount;
-            document.getElementById('brokerNotes').value = data.notes || '';
+            document.getElementById('brokerCurrency').value = fx.currency || 'INR';
+            document.getElementById('brokerFxRate').value = fx.fxRate || '';
+            document.getElementById('brokerAmount').value = fx.currency === 'EUR' && fx.originalAmount ? fx.originalAmount : data.amount;
+            document.getElementById('brokerNotes').value = fx.cleanNotes || '';
+            updateBrokerCurrencyDefaults();
             openModal('broker');
         })
         .catch(err => showError('Failed to load data'));
@@ -1955,12 +2113,16 @@ function openEditBrokerModal(id) {
 // Invest Modal (from Broker card)
 function openInvestModal(brokerId, brokerName, brokerDate, idleAmount) {
     document.getElementById('investBrokerId').value = brokerId;
+    document.getElementById('investSourceBroker').value = brokerName;
     document.getElementById('investSource').textContent = `${brokerName} - ${brokerDate}`;
     document.getElementById('investAvailable').textContent = formatCurrency(idleAmount);
     document.getElementById('investMaxAmount').value = idleAmount;
     document.getElementById('investDate').value = getTodayDate();
+    document.getElementById('investCurrency').value = isEuroBroker(brokerName) ? 'EUR' : 'INR';
+    document.getElementById('investFxRate').value = '';
     resetInvestmentPricingUi('invest', true);
     document.getElementById('investRemaining').textContent = formatCurrency(idleAmount);
+    updateInvestCurrencyDefaults();
     openModal('invest');
 }
 
@@ -1979,8 +2141,11 @@ function openInvestmentModal() {
     document.getElementById('investmentEditId').value = '';
     document.getElementById('investmentMode').value = 'regular';
     document.getElementById('investmentDate').value = getTodayDate();
+    document.getElementById('investmentCurrency').value = 'INR';
+    document.getElementById('investmentFxRate').value = '';
     resetInvestmentPricingUi('investment', true);
     toggleInvestmentMode();
+    updateInvestmentCurrencyDefaults();
     openModal('investment');
 }
 
@@ -1993,14 +2158,17 @@ function openEditInvestmentModal(id) {
     fetch(`${API_BASE}/investments/${id}`)
         .then(res => res.json())
         .then(async data => {
+            const fx = parseFxTag(data.notes || '');
             document.getElementById('investmentDate').value = data.date;
             document.getElementById('investmentHolding').value = data.holding_name;
-            document.getElementById('investmentAmount').value = data.amount;
+            document.getElementById('investmentCurrency').value = fx.currency || 'INR';
+            document.getElementById('investmentFxRate').value = fx.fxRate || '';
+            document.getElementById('investmentAmount').value = fx.currency === 'EUR' && fx.originalAmount ? fx.originalAmount : data.amount;
             document.getElementById('investmentAssetSearch').value = data.holding_name;
             document.getElementById('investmentUnitPrice').value = '';
             document.getElementById('investmentUnits').value = '';
             document.getElementById('investmentUnitPriceInfo').textContent = 'Re-select asset and click Fetch if you want unit-based recalculation.';
-            document.getElementById('investmentNotes').value = data.notes || '';
+            document.getElementById('investmentNotes').value = fx.cleanNotes || '';
 
             // For PPF/savings-backed investments, open in PPF mode and bind bank transfer.
             try {
@@ -2047,6 +2215,8 @@ function openEditInvestmentModal(id) {
                 );
                 document.getElementById('investmentBrokerCredit').value = data.broker_credit_id;
             }
+
+            updateInvestmentCurrencyDefaults();
 
             openModal('investment');
         })
@@ -2109,11 +2279,105 @@ function toggleInvestmentMode() {
         }
         document.getElementById('investmentAssetType').value = '';
     }
+
+    updateInvestmentCurrencyDefaults();
 }
 
 // ============================================
 // Form Helpers
 // ============================================
+function updateBankCurrencyDefaults() {
+    const bankSource = document.getElementById('bankSource')?.value || '';
+    const currencyEl = document.getElementById('bankCurrency');
+    if (!currencyEl) {
+        return;
+    }
+
+    if (isEuroBank(bankSource) && currencyEl.value === 'INR') {
+        currencyEl.value = 'EUR';
+    }
+
+    toggleFxInput('bankFxRateGroup', 'bankAmountLabel', currencyEl.value);
+}
+
+function updateAllocateCurrencyDefaults() {
+    const sourceBank = document.getElementById('allocateSourceBank')?.value || '';
+    const destination = document.getElementById('allocateDestination')?.value || '';
+    const currencyEl = document.getElementById('allocateCurrency');
+    if (!currencyEl) {
+        return;
+    }
+
+    const shouldBeEuro = isEuroBank(sourceBank) || isEuroBroker(destination);
+    if (shouldBeEuro && currencyEl.value === 'INR') {
+        currencyEl.value = 'EUR';
+    }
+
+    toggleFxInput('allocateFxRateGroup', 'allocateAmountLabel', currencyEl.value);
+    updateAllocateRemaining();
+}
+
+function updateBrokerCurrencyDefaults() {
+    const transferSelect = document.getElementById('brokerBankTransfer');
+    const destination = document.getElementById('brokerDestination')?.value || '';
+    const currencyEl = document.getElementById('brokerCurrency');
+    if (!currencyEl) {
+        return;
+    }
+
+    const selectedTransfer = transferSelect?.options?.[transferSelect.selectedIndex];
+    const sourceBank = selectedTransfer?.dataset?.sourceBank || '';
+    const shouldBeEuro = isEuroBank(sourceBank) || isEuroBroker(destination);
+
+    if (shouldBeEuro && currencyEl.value === 'INR') {
+        currencyEl.value = 'EUR';
+    }
+
+    toggleFxInput('brokerFxRateGroup', 'brokerAmountLabel', currencyEl.value);
+}
+
+function updateInvestCurrencyDefaults() {
+    const sourceBroker = document.getElementById('investSourceBroker')?.value || '';
+    const currencyEl = document.getElementById('investCurrency');
+    if (!currencyEl) {
+        return;
+    }
+
+    if (isEuroBroker(sourceBroker) && currencyEl.value === 'INR') {
+        currencyEl.value = 'EUR';
+    }
+
+    toggleFxInput('investFxRateGroup', 'investAmountLabel', currencyEl.value);
+    updateInvestRemaining();
+}
+
+function updateInvestmentCurrencyDefaults() {
+    const mode = document.getElementById('investmentMode')?.value || 'regular';
+    const currencyEl = document.getElementById('investmentCurrency');
+    if (!currencyEl) {
+        return;
+    }
+
+    let shouldBeEuro = false;
+    if (mode === 'ppf') {
+        const bankSelect = document.getElementById('investmentBankTransfer');
+        const selectedBank = bankSelect?.options?.[bankSelect.selectedIndex];
+        const sourceBank = selectedBank?.dataset?.sourceBank || '';
+        shouldBeEuro = isEuroBank(sourceBank);
+    } else {
+        const brokerSelect = document.getElementById('investmentBrokerCredit');
+        const selectedBroker = brokerSelect?.options?.[brokerSelect.selectedIndex];
+        const destination = selectedBroker?.dataset?.destination || '';
+        shouldBeEuro = isEuroBroker(destination);
+    }
+
+    if (shouldBeEuro && currencyEl.value === 'INR') {
+        currencyEl.value = 'EUR';
+    }
+
+    toggleFxInput('investmentFxRateGroup', 'investmentAmountLabel', currencyEl.value);
+}
+
 function updateDestinationType() {
     const select = document.getElementById('allocateDestination');
     const selected = select.options[select.selectedIndex];
@@ -2130,15 +2394,21 @@ function updateBrokerDestinationType() {
 
 function updateAllocateRemaining() {
     const max = parseFloat(document.getElementById('allocateMaxAmount').value) || 0;
-    const amount = parseFloat(document.getElementById('allocateAmount').value) || 0;
-    const remaining = max - amount;
+    const amountInput = parseFloat(document.getElementById('allocateAmount').value) || 0;
+    const currency = document.getElementById('allocateCurrency')?.value || 'INR';
+    const fxRate = parseFloat(document.getElementById('allocateFxRate')?.value || '0') || 0;
+    const inrAmount = convertToInr(amountInput, currency, fxRate);
+    const remaining = max - (Number.isFinite(inrAmount) ? inrAmount : 0);
     document.getElementById('allocateRemaining').textContent = formatCurrency(remaining);
 }
 
 function updateInvestRemaining() {
     const max = parseFloat(document.getElementById('investMaxAmount').value) || 0;
-    const amount = parseFloat(document.getElementById('investAmount').value) || 0;
-    const remaining = max - amount;
+    const amountInput = parseFloat(document.getElementById('investAmount').value) || 0;
+    const currency = document.getElementById('investCurrency')?.value || 'INR';
+    const fxRate = parseFloat(document.getElementById('investFxRate')?.value || '0') || 0;
+    const inrAmount = convertToInr(amountInput, currency, fxRate);
+    const remaining = max - (Number.isFinite(inrAmount) ? inrAmount : 0);
     document.getElementById('investRemaining').textContent = formatCurrency(remaining);
 }
 
@@ -2149,11 +2419,20 @@ async function saveBank(event) {
     event.preventDefault();
     
     const editId = document.getElementById('bankEditId').value;
+    const currency = document.getElementById('bankCurrency').value || 'INR';
+    const enteredAmount = parseFloat(document.getElementById('bankAmount').value);
+    const fxRate = parseFloat(document.getElementById('bankFxRate').value || '0');
+    const inrAmount = convertToInr(enteredAmount, currency, fxRate);
+    if (!Number.isFinite(inrAmount) || inrAmount <= 0) {
+        showError('Please enter a valid amount and FX rate.');
+        return;
+    }
+
     const data = {
         date: document.getElementById('bankDate').value,
         source_bank: document.getElementById('bankSource').value,
-        amount: parseFloat(document.getElementById('bankAmount').value),
-        notes: document.getElementById('bankNotes').value || null
+        amount: inrAmount,
+        notes: buildFxNotes(document.getElementById('bankNotes').value, currency, enteredAmount, fxRate)
     };
     
     const url = editId ? `${API_BASE}/bank-transfers/${editId}` : `${API_BASE}/bank-transfers`;
@@ -2181,14 +2460,23 @@ async function saveBank(event) {
 
 async function saveAllocate(event) {
     event.preventDefault();
+
+    const currency = document.getElementById('allocateCurrency').value || 'INR';
+    const enteredAmount = parseFloat(document.getElementById('allocateAmount').value);
+    const fxRate = parseFloat(document.getElementById('allocateFxRate').value || '0');
+    const inrAmount = convertToInr(enteredAmount, currency, fxRate);
+    if (!Number.isFinite(inrAmount) || inrAmount <= 0) {
+        showError('Please enter a valid amount and FX rate.');
+        return;
+    }
     
     const data = {
         bank_transfer_id: parseInt(document.getElementById('allocateBankId').value),
         date: document.getElementById('allocateDate').value,
         destination: document.getElementById('allocateDestination').value,
         destination_type: document.getElementById('allocateDestinationType').value,
-        amount: parseFloat(document.getElementById('allocateAmount').value),
-        notes: document.getElementById('allocateNotes').value || null
+        amount: inrAmount,
+        notes: buildFxNotes(document.getElementById('allocateNotes').value, currency, enteredAmount, fxRate)
     };
     
     try {
@@ -2215,13 +2503,22 @@ async function saveBrokerDirect(event) {
     event.preventDefault();
     
     const editId = document.getElementById('brokerEditId').value;
+    const currency = document.getElementById('brokerCurrency').value || 'INR';
+    const enteredAmount = parseFloat(document.getElementById('brokerAmount').value);
+    const fxRate = parseFloat(document.getElementById('brokerFxRate').value || '0');
+    const inrAmount = convertToInr(enteredAmount, currency, fxRate);
+    if (!Number.isFinite(inrAmount) || inrAmount <= 0) {
+        showError('Please enter a valid amount and FX rate.');
+        return;
+    }
+
     const data = {
         bank_transfer_id: parseInt(document.getElementById('brokerBankTransfer').value),
         date: document.getElementById('brokerDate').value,
         destination: document.getElementById('brokerDestination').value,
         destination_type: document.getElementById('brokerDestinationType').value,
-        amount: parseFloat(document.getElementById('brokerAmount').value),
-        notes: document.getElementById('brokerNotes').value || null
+        amount: inrAmount,
+        notes: buildFxNotes(document.getElementById('brokerNotes').value, currency, enteredAmount, fxRate)
     };
     
     const url = editId ? `${API_BASE}/broker-credits/${editId}` : `${API_BASE}/broker-credits`;
@@ -2249,13 +2546,22 @@ async function saveBrokerDirect(event) {
 
 async function saveInvest(event) {
     event.preventDefault();
+
+    const currency = document.getElementById('investCurrency').value || 'INR';
+    const enteredAmount = parseFloat(document.getElementById('investAmount').value);
+    const fxRate = parseFloat(document.getElementById('investFxRate').value || '0');
+    const inrAmount = convertToInr(enteredAmount, currency, fxRate);
+    if (!Number.isFinite(inrAmount) || inrAmount <= 0) {
+        showError('Please enter a valid amount and FX rate.');
+        return;
+    }
     
     const data = {
         broker_credit_id: parseInt(document.getElementById('investBrokerId').value),
         date: document.getElementById('investDate').value,
         holding_name: document.getElementById('investHolding').value,
-        amount: parseFloat(document.getElementById('investAmount').value),
-        notes: document.getElementById('investNotes').value || null
+        amount: inrAmount,
+        notes: buildFxNotes(document.getElementById('investNotes').value, currency, enteredAmount, fxRate)
     };
     
     try {
@@ -2283,11 +2589,20 @@ async function saveInvestmentDirect(event) {
     
     const editId = document.getElementById('investmentEditId').value;
     const mode = document.getElementById('investmentMode').value;
+    const currency = document.getElementById('investmentCurrency').value || 'INR';
+    const enteredAmount = parseFloat(document.getElementById('investmentAmount').value);
+    const fxRate = parseFloat(document.getElementById('investmentFxRate').value || '0');
+    const inrAmount = convertToInr(enteredAmount, currency, fxRate);
+    if (!Number.isFinite(inrAmount) || inrAmount <= 0) {
+        showError('Please enter a valid amount and FX rate.');
+        return;
+    }
+
     const data = {
         date: document.getElementById('investmentDate').value,
         holding_name: document.getElementById('investmentHolding').value,
-        amount: parseFloat(document.getElementById('investmentAmount').value),
-        notes: document.getElementById('investmentNotes').value || null
+        amount: inrAmount,
+        notes: buildFxNotes(document.getElementById('investmentNotes').value, currency, enteredAmount, fxRate)
     };
 
     if (mode === 'ppf') {
@@ -2585,13 +2900,13 @@ async function loadMonthBankTransfers() {
 
     select.innerHTML = '<option value="">Loading...</option>';
     try {
-        const res = await fetch(`${API_BASE}/bank-transfers?with_idle_only=true&month=${encodeURIComponent(month)}`);
+        const res = await fetch(`${API_BASE}/bank-transfers?with_idle_only=true&month=${encodeURIComponent(month)}&include_previous_months=true`);
         if (!res.ok) {
             throw new Error('Failed to load month bank transfers');
         }
         const transfers = await res.json();
         if (!transfers.length) {
-            select.innerHTML = '<option value="">No Idle Amt left for selected month</option>';
+            select.innerHTML = '<option value="">No idle amount in selected month or earlier</option>';
             return false;
         }
 
@@ -2615,13 +2930,13 @@ async function loadMonthBrokerCredits(preselectedCreditId = null) {
 
     select.innerHTML = '<option value="">Loading...</option>';
     try {
-        const res = await fetch(`${API_BASE}/broker-credits?with_idle_only=true&month=${encodeURIComponent(month)}&broker=zerodha`);
+        const res = await fetch(`${API_BASE}/broker-credits?with_idle_only=true&month=${encodeURIComponent(month)}&broker=zerodha&include_previous_months=true`);
         if (!res.ok) {
             throw new Error('Failed to load month broker credits');
         }
         const credits = await res.json();
         if (!credits.length) {
-            select.innerHTML = '<option value="">No Idle Amt in Zerodha credits for selected month</option>';
+            select.innerHTML = '<option value="">No idle amount in Zerodha credits for selected month or earlier</option>';
             return false;
         }
 
@@ -2818,7 +3133,7 @@ async function loadCoinDueSIPsPreview() {
                         && lastExecuted.getFullYear() === executionDate.getFullYear()
                         && lastExecuted.getMonth() === executionDate.getMonth();
 
-                    if (dates.includes(adjustedDate.getDate()) && !alreadyExecutedThisMonth) {
+                    if (dates.includes(executionDate.getDate()) && !alreadyExecutedThisMonth) {
                         dueForDate.push(sip);
                     }
                 }
@@ -2929,7 +3244,7 @@ async function loadZerodhaDueSIPsPreview() {
                         && lastExecuted.getFullYear() === executionDate.getFullYear()
                         && lastExecuted.getMonth() === executionDate.getMonth();
 
-                    if (dates.includes(adjustedDate.getDate()) && !alreadyExecutedThisMonth) {
+                    if (dates.includes(executionDate.getDate()) && !alreadyExecutedThisMonth) {
                         dueForDate.push(sip);
                     }
                 }
@@ -3187,10 +3502,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Parse SIP notes and display frequency + dates
+    // Parse notes for SIP metadata and optional FX metadata.
     document.querySelectorAll('.card-notes[data-notes]').forEach(notesDiv => {
         const notes = notesDiv.dataset.notes;
-        const parsed = parseSIPNotes(notes);
+        const fx = parseFxTag(notes);
+        const parsed = parseSIPNotes(fx.cleanNotes);
+
+        const card = notesDiv.closest('.flow-card');
+        const amountEl = card ? card.querySelector('.card-amount') : null;
+        if (amountEl && fx.currency === 'EUR' && fx.originalAmount) {
+            amountEl.innerHTML = `${amountEl.textContent} <small style="display:block; color:#666; font-size:0.72em; font-weight:500;">${formatEuro(fx.originalAmount)}</small>`;
+        }
         
         const freqDisplay = notesDiv.querySelector('.sip-frequency-display');
         const datesDisplay = notesDiv.querySelector('.sip-dates-display');
@@ -3210,7 +3532,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Fallback for normal notes (including manual PPF deposits) that are not SIP metadata.
         if (!parsed.frequency && (!parsed.dates || parsed.dates.length === 0)) {
-            notesDiv.textContent = notes;
+            const clean = fx.cleanNotes;
+            if (clean) {
+                notesDiv.textContent = clean;
+            } else {
+                notesDiv.style.display = 'none';
+            }
         }
     });
 
