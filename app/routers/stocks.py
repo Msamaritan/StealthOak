@@ -15,11 +15,81 @@ from app.models import Holding, Portfolio
 from app.schemas import HoldingCreate
 from app.services.price_fetcher import price_fetcher
 from app.services.portfolio_stats import portfolio_stats
+from app.utils import get_configured_templates
+
 
 
 router = APIRouter(prefix="/stocks", tags=["Stocks"])
 
-templates = Jinja2Templates(directory="app/templates")
+templates = get_configured_templates()
+
+
+def _stocks_market_cards() -> List[dict]:
+    return [
+        {
+            "theme": "india",
+            "title": "Indian Market",
+            "picture_label": "Indian Market",
+            "image_url": "/static/images/indian_market.jpg",
+            "description": "Track NSE and BSE holdings, sync prices, and manage your current portfolio.",
+            "cta": "Open Indian Stocks",
+            "href": "/stocks/india",
+        },
+        {
+            "theme": "foreign",
+            "title": "Foreign Market",
+            "picture_label": "Foreign Market",
+            "image_url": "/static/images/foreign_market.jpg",
+            "description": "A separate view for overseas stocks, ETFs, and future foreign price integrations.",
+            "cta": "Open Foreign Stocks",
+            "href": "/stocks/foreign",
+        },
+    ]
+
+
+def _render_market_selector(request: Request):
+    return templates.TemplateResponse(
+        "market_selector.html",
+        {
+            "request": request,
+            "page_title": "Stocks Markets",
+            "heading": "Stocks",
+            "description": "Choose the market you want to manage.",
+            "cards": _stocks_market_cards(),
+        },
+    )
+
+
+def _render_foreign_market_page(request: Request):
+    return templates.TemplateResponse(
+        "market_placeholder.html",
+        {
+            "request": request,
+            "page_title": "Foreign Stocks",
+            "heading": "Foreign Stocks",
+            "description": "Template-only view for overseas holdings.",
+            "back_url": "/stocks",
+            "placeholder_title": "Foreign market page scaffolded",
+            "placeholder_copy": "This page is ready for future foreign stock data, price fetching, and ETF support.",
+            "features": [
+                {
+                    "label": "Stocks",
+                    "title": "Global equities",
+                    "copy": "A dedicated holdings table can live here once foreign price sources are wired up.",
+                },
+                {
+                    "label": "ETFs",
+                    "title": "Exchange-traded funds",
+                    "copy": "Useful for foreign market exposure and will fit naturally into the same layout.",
+                },
+                {
+                    "label": "Mutual funds",
+                    "title": "International schemes",
+                    "copy": "You can reuse the same market split for overseas fund views later.",
+                },
+            ],
+        },
+    )
 
 
 # ----------------------------------------
@@ -27,15 +97,18 @@ templates = Jinja2Templates(directory="app/templates")
 # ----------------------------------------
 
 @router.get("", response_class=HTMLResponse)
-async def stocks_list_page(
+async def stocks_market_page(request: Request):
+    """Stocks market landing page."""
+    return _render_market_selector(request)
+
+
+@router.get("/india", response_class=HTMLResponse)
+@router.get("/indian", response_class=HTMLResponse)
+async def indian_stocks_page(
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Stocks listing page.
-    
-    Shows all stocks with live prices.
-    """
+    """Indian stocks listing page."""
     # Query only stocks
     result = await db.execute(
         select(Holding).where(Holding.asset_type == "stock")
@@ -54,6 +127,12 @@ async def stocks_list_page(
             "stocks": enriched,
         }
     )
+
+
+@router.get("/foreign", response_class=HTMLResponse)
+async def foreign_stocks_page(request: Request):
+    """Foreign stocks landing page placeholder."""
+    return _render_foreign_market_page(request)
 
 
 @router.get("/add", response_class=HTMLResponse)
@@ -145,7 +224,7 @@ async def update_stock_form(
     holding.quantity = quantity
     holding.avg_price = avg_price
     
-    return RedirectResponse(url="/stocks", status_code=303)
+    return RedirectResponse(url="/stocks/india", status_code=303)
 
 
 # ----------------------------------------
@@ -320,7 +399,7 @@ async def create_stock_form(
     db.add(holding)
     
     # Redirect to stocks list
-    return RedirectResponse(url="/stocks", status_code=303)
+    return RedirectResponse(url="/stocks/india", status_code=303)
 
 
 @router.delete("/api/{holding_id}")
@@ -348,6 +427,28 @@ async def delete_stock(
     await db.delete(holding)
     
     return {"message": "Stock deleted successfully", "id": holding_id}
+
+
+@router.delete("/api")
+async def delete_all_stocks(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete all stock holdings.
+    """
+    result = await db.execute(
+        select(Holding).where(Holding.asset_type == "stock")
+    )
+    holdings = list(result.scalars().all())
+
+    deleted_count = len(holdings)
+    for holding in holdings:
+        await db.delete(holding)
+
+    return {
+        "message": "All stocks deleted successfully",
+        "deleted": deleted_count,
+    }
 
 
 @router.get("/api/{holding_id}/price")

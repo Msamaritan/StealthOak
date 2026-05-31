@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} - StealthOak{% endblock %}
+
+{% block content %}
+<div class="market-page market-selector-page">
+    <div class="page-header market-page-header">
+        <div>
+            <h2>{{ heading }}</h2>
+            <p class="market-page-subtitle">{{ description }}</p>
+        </div>
+    </div>
+
+    <div class="market-card-grid">
+        {% for card in cards %}
+        <a href="{{ card.href }}" class="market-card market-card--{{ card.theme }}">
+            <div class="market-card-frame">
+                <div class="market-card-picture">
+                    {% if card.image_url %}
+                        <img src="{{ card.image_url }}" alt="{{ card.title }}" class="market-card-image">
+                    {% else %}
+                        <span>{{ card.picture_label }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="market-card-copy">
+                <h3>{{ card.title }}</h3>
+                <p>{{ card.description }}</p>
+                <span class="market-card-cta">{{ card.cta }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -43,9 +43,16 @@ def _to_float(value, default: float = 0.0) -> float:
         return default
 
 
+def _normalize_code(value: str | None, *, upper: bool = False) -> str | None:
+    text = (value or "").strip()
+    if not text:
+        return None
+    return text.upper() if upper else text
+
+
 def _map_kite_stock_holding(row: dict) -> dict | None:
-    symbol = str(row.get("tradingsymbol") or row.get("symbol") or "").strip().upper()
-    exchange = str(row.get("exchange") or "NSE").strip().upper()
+    symbol = _normalize_code(str(row.get("tradingsymbol") or row.get("symbol") or ""), upper=True) or ""
+    exchange = _normalize_code(str(row.get("exchange") or "NSE"), upper=True) or "NSE"
     quantity = _to_float(row.get("quantity"), 0.0)
     avg_price = _to_float(row.get("average_price"), 0.0)
     name = str(row.get("name") or symbol).strip() or symbol
@@ -66,7 +73,7 @@ def _map_kite_stock_holding(row: dict) -> dict | None:
         "exchange": exchange,
         "quantity": quantity,
         "avg_price": avg_price,
-        "isin": (str(row.get("isin")).strip() if row.get("isin") else None),
+        "isin": _normalize_code(str(row.get("isin")) if row.get("isin") else None, upper=True),
         "instrument_token": instrument_token,
         "source": "kite_holding",
     }
@@ -85,7 +92,7 @@ def _map_kite_mf_holding(row: dict) -> dict | None:
     avg_price = _to_float(row.get("average_price") or row.get("purchase_price") or row.get("nav"), 0.0)
     kite_last_price = _to_float(row.get("last_price") or row.get("nav"), 0.0)
     kite_last_price_date = str(row.get("last_price_date") or "").strip() or None
-    isin = str(row.get("isin") or row.get("tradingsymbol") or "").strip() or None
+    isin = _normalize_code(str(row.get("isin") or row.get("tradingsymbol") or ""), upper=True)
 
     if not symbol or quantity <= 0 or avg_price <= 0:
         return None
@@ -285,17 +292,35 @@ async def _resolve_mf_scheme_code_with_nav_date(
 
 
 def _stock_identity_key(symbol: str, exchange: str, isin: str | None, instrument_token: int | None) -> tuple:
-    if instrument_token is not None:
-        return ("instrument", instrument_token)
-    if isin:
-        return ("isin", isin)
-    return ("symbol", symbol.upper(), exchange.upper())
+    """
+    Create a stable identity key for stock holdings.
+    
+    Key priority (in order of preference):
+    1. ISIN (most stable - instrument agnostic)
+    2. Symbol + Exchange (fallback when ISIN not available)
+    NOTE: instrument_token is NOT used as primary key because existing DB rows
+          may not have it stored (created manually or from older syncs without it).
+          Using it would create false mismatches and duplicate inserts.
+    """
+    normalized_symbol = (symbol or "").strip().upper()
+    normalized_exchange = (exchange or "NSE").strip().upper()
+    normalized_isin = _normalize_code(isin, upper=True)
+
+    # Prefer ISIN if available
+    if normalized_isin:
+        return ("isin", normalized_isin)
+    
+    # Fall back to symbol + exchange
+    return ("symbol", normalized_symbol, normalized_exchange)
 
 
 def _mf_identity_key(symbol: str, isin: str | None) -> tuple:
-    if isin:
-        return ("isin", isin)
-    return ("symbol", symbol)
+    normalized_symbol = (symbol or "").strip()
+    normalized_isin = _normalize_code(isin, upper=True)
+
+    if normalized_isin:
+        return ("isin", normalized_isin)
+    return ("symbol", normalized_symbol)
 
 
 def _is_kite_auth_error(error_text: str, error_trace: str) -> bool:
@@ -320,7 +345,7 @@ def _is_kite_auth_error(error_text: str, error_trace: str) -> bool:
 async def _get_authenticated_kite(db: AsyncSession):
     """Return an authenticated Kite service from memory or persisted session."""
     kite = get_kite_service()
-    if kite:
+    if kite and getattr(kite, "access_token", None):
         return kite
 
     result = await db.execute(
@@ -464,6 +489,11 @@ async def sync_kite_holdings(
         if asset_kind == "stocks":
             raw_holdings = kite.get_holdings()
             mapped_rows = [m for m in (_map_kite_stock_holding(row) for row in raw_holdings) if m]
+            deduped_rows = {}
+            for row in mapped_rows:
+                key = _stock_identity_key(row["symbol"], row["exchange"], row.get("isin"), row.get("instrument_token"))
+                deduped_rows[key] = row
+            mapped_rows = list(deduped_rows.values())
 
             result = await db.execute(select(Holding).where(Holding.asset_type == "stock"))
             existing_rows = list(result.scalars().all())
@@ -493,6 +523,7 @@ async def sync_kite_holdings(
                         last_synced_at=dt.datetime.utcnow(),
                     )
                     db.add(holding)
+                    existing_map[key] = holding
                     created += 1
                 else:
                     # Update existing holding if necessary
@@ -520,20 +551,16 @@ async def sync_kite_holdings(
         else:
             raw_holdings = kite.get_mf_holdings()
             mapped_rows = [m for m in (_map_kite_mf_holding(row) for row in raw_holdings) if m]
+            deduped_rows = {}
+            for row in mapped_rows:
+                key = _mf_identity_key(row["symbol"], row.get("isin"))
+                deduped_rows[key] = row
+            mapped_rows = list(deduped_rows.values())
             
-            # Fetch AMFI master - optional for auto-resolution
-            # If AMFI is unreachable (geoblocked outside India, or corporate firewall),
-            # sync will fall back to manual resolution UI
+            # AMFI fetch is intentionally skipped to avoid sync latency/timeouts on
+            # geoblocked or corporate networks. Keep an empty map and use fallback
+            # resolver paths below.
             amfi_by_isin = {}
-            try:
-                amfi_by_isin = await price_fetcher.get_amfi_isin_scheme_map()
-                print(f"[SYNC MF] Loaded {len(amfi_by_isin)} AMFI scheme mappings")
-            except Exception as e:
-                error_type = type(e).__name__
-                print(f"[SYNC MF] WARNING: AMFI load failed ({error_type})")
-                print(f"           → AMFI is geoblocked outside India or unreachable due to firewall")
-                print(f"           → Sync will still work - use manual '🔍 Resolve' UI for unresolved funds")
-                print(f"           → Or set corporate proxy env vars if behind firewall")
 
             instrument_rows = kite.get_mf_instruments()
             instruments_by_isin: dict[str, dict] = {
@@ -547,11 +574,11 @@ async def sync_kite_holdings(
 
             # Persisted stabilization map: ISIN -> scheme_code.
             scheme_by_isin: dict[str, str] = {
-                item.isin: item.symbol
+                _normalize_code(item.isin, upper=True): item.symbol
                 for item in existing_rows
                 ## Normally symbol is filled with KITE trading symbol, but once we resolve
                 ## mutual funds, symbol will be updated to scheme code.
-                if item.isin and _looks_like_mf_scheme_code(item.symbol)
+                if _normalize_code(item.isin, upper=True) and _looks_like_mf_scheme_code(item.symbol)
             }
 
             for row in mapped_rows:
@@ -580,23 +607,6 @@ async def sync_kite_holdings(
                             unresolved += 1
                             continue
 
-                        amfi_meta = amfi_by_isin.get((isin or "").upper()) if isin else None
-                        if amfi_meta:
-                            amfi_nav = amfi_meta.get("nav")
-                            try:
-                                amfi_nav = float(amfi_nav) if amfi_nav is not None else None
-                            except (TypeError, ValueError):
-                                amfi_nav = None
-
-                            if _validate_nav_and_date(
-                                kite_nav=row.get("kite_last_price"),
-                                kite_date_raw=row.get("kite_last_price_date"),
-                                ref_nav=amfi_nav,
-                                ref_date_raw=amfi_meta.get("date"),
-                            ):
-                                resolved_code = str(amfi_meta.get("scheme_code") or "").strip() or None
-                                resolved_name = str(amfi_meta.get("scheme_name") or "").strip() or None
-
                         if not resolved_code:
                             resolved_code, resolved_name, _debug = await _resolve_mf_scheme_code_with_nav_date(
                                 fund_name=row.get("name") or (instrument.get("name") if instrument else "") or "",
@@ -616,7 +626,10 @@ async def sync_kite_holdings(
                     if resolved_name:
                         row["name"] = resolved_name
                     if row.get("isin"):
-                        scheme_by_isin[row["isin"]] = resolved_code
+                        normalized_isin = _normalize_code(row["isin"], upper=True)
+                        if normalized_isin:
+                            row["isin"] = normalized_isin
+                            scheme_by_isin[normalized_isin] = resolved_code
                     row["_resolved"] = True
 
             existing_map = {}
@@ -659,6 +672,11 @@ async def sync_kite_holdings(
                         last_synced_at=dt.datetime.utcnow(),
                     )
                     db.add(holding)
+                    existing_map[key] = holding
+                    if row.get("isin"):
+                        normalized_isin = _normalize_code(row["isin"], upper=True)
+                        if normalized_isin and _looks_like_mf_scheme_code(row["symbol"]):
+                            scheme_by_isin[normalized_isin] = row["symbol"]
                     created += 1
                     continue
 

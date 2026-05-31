@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} - StealthOak{% endblock %}
+
+{% block content %}
+<div class="market-page">
+    <div class="page-header market-page-header">
+        <div>
+            <h2>{{ heading }}</h2>
+            <p class="market-page-subtitle">{{ description }}</p>
+        </div>
+        <div>
+            <a href="{{ back_url }}" class="btn btn-secondary">Back to market selection</a>
+        </div>
+    </div>
+
+    <div class="content-card market-placeholder-card">
+        <span class="market-placeholder-badge">Template ready</span>
+        <h3>{{ placeholder_title }}</h3>
+        <p>{{ placeholder_copy }}</p>
+    </div>
+
+    <div class="market-feature-grid">
+        {% for feature in features %}
+        <div class="content-card market-feature-card">
+            <span class="market-feature-label">{{ feature.label }}</span>
+            <h3>{{ feature.title }}</h3>
+            <p>{{ feature.copy }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

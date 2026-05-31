@@ -10,7 +10,7 @@
     <div class="metrics-row wealth-metrics">
         <div class="metric-card">
             <span class="metric-label">Total Invested</span>
-            <span class="metric-value">₹{{ "{:,.2f}".format(total_invested) }}</span>
+            <span class="metric-value">{{ total_invested|format_currency('INR') }}</span>
             {% if total_invested > 0 %}
             <div class="metric-breakdown">
                 <span class="breakdown-stock">📈 {{ stock_alloc }}%</span>
@@ -25,7 +25,7 @@
         <div class="metric-card">
             <span class="metric-label">Total Current Value</span>
             <span class="metric-value {% if total_current >= total_invested %}profit{% else %}loss{% endif %}">
-                ₹{{ "{:,.2f}".format(total_current) }}
+                {{ total_current|format_currency('INR') }}
                 {% if total_invested > 0 %}
                 <small>({{ "{:+.2f}".format(total_pnl_percent) }}%)</small>
                 {% endif %}
@@ -35,7 +35,7 @@
         <div class="metric-card">
             <span class="metric-label">Total P&amp;L</span>
             <span class="metric-value {% if total_pnl >= 0 %}profit{% else %}loss{% endif %}">
-                {% if total_pnl >= 0 %}+{% endif %}₹{{ "{:,.2f}".format(total_pnl) }}
+                {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|format_currency('INR') }}
                 <small>({{ "{:+.2f}".format(total_pnl_percent) }}%)</small>
             </span>
         </div>
@@ -61,10 +61,10 @@
                 <tr>
                     <td><strong>{{ row.asset }}</strong></td>
                     <td class="text-muted">{{ row.alloc_percent }}%</td>
-                    <td>₹{{ "{:,.2f}".format(row.invested) }}</td>
-                    <td>₹{{ "{:,.2f}".format(row.current) }}</td>
+                    <td>{{ row.invested|format_currency('INR') }}</td>
+                    <td>{{ row.current|format_currency('INR') }}</td>
                     <td class="{% if row.pnl >= 0 %}profit{% else %}loss{% endif %}">
-                        {% if row.pnl >= 0 %}+{% endif %}₹{{ "{:,.2f}".format(row.pnl) }}
+                        {% if row.pnl >= 0 %}+{% endif %}{{ row.pnl|format_currency('INR') }}
                     </td>
                     <td class="{% if row.pnl_percent >= 0 %}profit{% else %}loss{% endif %}">
                         {{ "{:+.2f}".format(row.pnl_percent) }}%
