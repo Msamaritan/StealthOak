@@ -3,6 +3,7 @@ Insurance models for policy metadata and premium payment tracking.
 """
 
 import datetime as dt
+import calendar
 from typing import List, Optional
 
 from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, String, func
@@ -37,16 +38,23 @@ class InsurancePolicy(Base):
     ## Lifecycle fields
     start_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     maturity_date: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    policy_term: Mapped[Optional[int]] = mapped_column(nullable=True)  # in years
 
     ## Premium details
     premium_amount: Mapped[float] = mapped_column(Float, nullable=False)
     premium_frequency: Mapped[str] = mapped_column(
         String(20), nullable=False, default="yearly"
     )  # monthly / quarterly / half_yearly / yearly / single
+    last_premium_payment_date: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    total_premium_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     sum_assured: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    current_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    tax_section: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    maturity_benefit_value: Mapped[Optional[float]] = mapped_column(
+        "current_value", Float, nullable=True
+    )
+    compute_investment_gain: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
 
     ## Status fields
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -93,29 +101,75 @@ class InsurancePolicy(Base):
 
     @property
     def total_premium_for_term(self) -> Optional[float]:
-        """Estimated total premium payable over full policy term."""
-        term_years = self.policy_term_years
-        if term_years is None:
-            return None
-
-        multiplier_by_frequency = {
-            "single": 1,
-            "yearly": max(term_years, 1),
-            "half_yearly": max(term_years, 1) * 2,
-            "quarterly": max(term_years, 1) * 4,
-            "monthly": max(term_years, 1) * 12,
-        }
-
-        installments = multiplier_by_frequency.get(self.premium_frequency, max(term_years, 1))
-        return round(self.premium_amount * installments, 2)
+        """Total premium amount for full policy term as entered by user."""
+        return self.total_premium_amount
 
     @property
     def remaining_premium_for_term(self) -> Optional[float]:
-        """Estimated remaining premium amount for full policy term."""
+        """Remaining premium amount for full policy term."""
         total_term = self.total_premium_for_term
         if total_term is None:
             return None
         return round(max(total_term - self.total_premium_paid, 0.0), 2)
+
+    @property
+    def investment_gain_percent(self) -> Optional[float]:
+        """Gain percentage from investment base to maturity benefit value."""
+        if not self.compute_investment_gain:
+            return None
+
+        if self.maturity_benefit_value is None:
+            return None
+
+        # Use full-term premium as primary base to avoid inflated gains when
+        # only a few payments are logged; fall back to paid amount if needed.
+        base_amount = self.total_premium_amount or self.total_premium_paid
+        if base_amount is None or base_amount <= 0:
+            return None
+
+        gain_pct = ((self.maturity_benefit_value - base_amount) / base_amount) * 100.0
+        return round(gain_pct, 2)
+
+    @staticmethod
+    def _add_months(date_value: dt.date, months: int) -> dt.date:
+        """
+        Add months safely while preserving day where possible.
+        31-Jan + 1 month -> Feb has no 31st, so it becomes 28-Feb (or 29-Feb in leap year).
+        This avoids invalid dates and crashes.
+        """
+        year = date_value.year + (date_value.month - 1 + months) // 12
+        month = (date_value.month - 1 + months) % 12 + 1
+        day = min(date_value.day, calendar.monthrange(year, month)[1])
+        return dt.date(year, month, day)
+
+    @property
+    def next_premium_date(self) -> Optional[dt.date]:
+        """Next premium date computed from start date schedule and frequency."""
+        if self.premium_frequency == "single":
+            return None
+
+        if not self.start_date:
+            return None
+
+        month_increment = {
+            "monthly": 1,
+            "quarterly": 3,
+            "half_yearly": 6,
+            "yearly": 12,
+        }.get(self.premium_frequency)
+
+        if month_increment is None:
+            return None
+
+        today = dt.date.today()
+        next_date = self.start_date
+        while next_date < today:
+            next_date = self._add_months(next_date, month_increment)
+
+        if self.maturity_date and next_date > self.maturity_date:
+            return None
+
+        return next_date
 
     def __repr__(self) -> str:
         return f"<InsurancePolicy {self.provider}:{self.policy_name}>"
@@ -134,7 +188,6 @@ class InsurancePremiumPayment(Base):
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     payment_mode: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     reference_no: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
-    tax_claim_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False

@@ -7,18 +7,18 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import InsurancePolicy, InsurancePremiumPayment
+from app.utils import get_configured_templates
 
 
 router = APIRouter(prefix="/insurance", tags=["Insurance"])
 
-templates = Jinja2Templates(directory="app/templates")
+templates = get_configured_templates()
 
 
 CATEGORY_LABELS = {
@@ -78,8 +78,17 @@ def _parse_policy_form(form, errors: List[str]) -> Dict[str, Optional[object]]:
     policy_number = (form.get("policy_number") or "").strip()
     insured_person = (form.get("insured_person") or "").strip()
     nominee = (form.get("nominee") or "").strip() or None
-    tax_section = (form.get("tax_section") or "").strip() or None
     notes = (form.get("notes") or "").strip() or None
+
+    policy_term_str = (form.get("policy_term") or "").strip()
+    policy_term = None
+    if policy_term_str:
+        try:
+            policy_term = int(policy_term_str)
+            if policy_term < 1:
+                errors.append("Policy term must be at least 1 year")
+        except ValueError:
+            errors.append("Policy term must be a valid number")
 
     if not policy_name:
         errors.append("Policy name is required")
@@ -97,11 +106,24 @@ def _parse_policy_form(form, errors: List[str]) -> Dict[str, Optional[object]]:
         errors.append("Premium frequency is invalid")
 
     start_date = _parse_date(form.get("start_date", ""), "start date", errors, required=True)
+    last_premium_payment_date = _parse_date(
+        form.get("last_premium_payment_date", ""),
+        "last premium payment date",
+        errors,
+        required=True,
+    )
     maturity_date = _parse_date(form.get("maturity_date", ""), "maturity date", errors, required=False)
 
     premium_amount = _parse_float(
         form.get("premium_amount", ""),
         "premium amount",
+        errors,
+        required=True,
+        positive=True,
+    )
+    total_premium_amount = _parse_float(
+        form.get("total_premium_amount", ""),
+        "total premium amount",
         errors,
         required=True,
         positive=True,
@@ -113,15 +135,25 @@ def _parse_policy_form(form, errors: List[str]) -> Dict[str, Optional[object]]:
         required=False,
         positive=True,
     )
-    current_value = _parse_float(
-        form.get("current_value", ""),
-        "current value",
+    maturity_benefit_value = _parse_float(
+        form.get("maturity_benefit_value", form.get("current_value", "")),
+        "maturity benefit value",
         errors,
         required=False,
     )
+    compute_investment_gain = (form.get("compute_investment_gain") or "").strip().lower() in {
+        "true",
+        "1",
+        "yes",
+        "on",
+    }
 
     if start_date and maturity_date and maturity_date < start_date:
         errors.append("Maturity date cannot be earlier than start date")
+    if start_date and last_premium_payment_date and last_premium_payment_date < start_date:
+        errors.append("Last premium payment date cannot be earlier than start date")
+    if maturity_date and last_premium_payment_date and last_premium_payment_date > maturity_date:
+        errors.append("Last premium payment date cannot be later than maturity date")
 
     is_active_raw = (form.get("is_active") or "true").strip().lower()
     is_active = is_active_raw in {"true", "1", "yes", "on"}
@@ -135,12 +167,15 @@ def _parse_policy_form(form, errors: List[str]) -> Dict[str, Optional[object]]:
         "insured_person": insured_person,
         "nominee": nominee,
         "start_date": start_date,
+        "last_premium_payment_date": last_premium_payment_date,
         "maturity_date": maturity_date,
+        "policy_term": policy_term,
         "premium_amount": premium_amount,
+        "total_premium_amount": total_premium_amount,
         "premium_frequency": premium_frequency,
         "sum_assured": sum_assured,
-        "current_value": current_value,
-        "tax_section": tax_section,
+        "maturity_benefit_value": maturity_benefit_value,
+        "compute_investment_gain": compute_investment_gain,
         "notes": notes,
         "is_active": is_active,
     }
@@ -221,12 +256,15 @@ async def get_policy(policy_id: int, db: AsyncSession = Depends(get_db)):
         "insured_person": policy.insured_person,
         "nominee": policy.nominee or "",
         "start_date": policy.start_date.isoformat(),
+        "last_premium_payment_date": policy.last_premium_payment_date.isoformat() if policy.last_premium_payment_date else "",
         "maturity_date": policy.maturity_date.isoformat() if policy.maturity_date else "",
+        "policy_term": policy.policy_term,
         "premium_amount": policy.premium_amount,
+        "total_premium_amount": policy.total_premium_amount,
         "premium_frequency": policy.premium_frequency,
         "sum_assured": policy.sum_assured,
-        "current_value": policy.current_value,
-        "tax_section": policy.tax_section or "",
+        "maturity_benefit_value": policy.maturity_benefit_value,
+        "compute_investment_gain": policy.compute_investment_gain,
         "notes": policy.notes or "",
         "is_active": policy.is_active,
     }
@@ -290,13 +328,6 @@ async def add_policy_payment(
         required=True,
         positive=True,
     )
-    tax_claim_amount = _parse_float(
-        form.get("tax_claim_amount", ""),
-        "tax claim amount",
-        errors,
-        required=False,
-    )
-
     payment_mode = (form.get("payment_mode") or "").strip() or None
     reference_no = (form.get("reference_no") or "").strip() or None
     notes = (form.get("notes") or "").strip() or None
@@ -310,7 +341,6 @@ async def add_policy_payment(
         amount=amount,
         payment_mode=payment_mode,
         reference_no=reference_no,
-        tax_claim_amount=tax_claim_amount,
         notes=notes,
     )
     db.add(payment)
@@ -343,7 +373,6 @@ async def list_policy_payments(policy_id: int, db: AsyncSession = Depends(get_db
                 "amount": payment.amount,
                 "payment_mode": payment.payment_mode or "",
                 "reference_no": payment.reference_no or "",
-                "tax_claim_amount": payment.tax_claim_amount,
                 "notes": payment.notes or "",
             }
             for payment in payments

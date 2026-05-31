@@ -20,18 +20,11 @@
         </div>
         <div class="metric-card">
             <span class="metric-label">Total Premium Paid</span>
-            <span class="metric-value">₹{{ "{:,.2f}".format(total_premium_paid) }}</span>
+            <span class="metric-value">₹{{ "{:,.2f}".format(total_premium_paid)|format_indian_rupee }}</span>
         </div>
     </div>
 
-    {% if total_policy_count == 0 %}
-    <div class="content-card insurance-empty">
-        <p class="empty-message">No insurance policies yet. Click + Add Policy to begin.</p>
-    </div>
-    {% endif %}
-
-    {% for category_key in ["lic", "health", "general", "other"] %}
-        {% set grouped = policies_by_category.get(category_key, []) %}
+    {% for category_key, grouped in policies_by_category.items() %}
         {% if grouped %}
         <section class="insurance-section">
             <div class="insurance-section-head">
@@ -50,6 +43,7 @@
                             <th>Start</th>
                             <th>Last Premium Date</th>
                             <th>Total Premium Payment</th>
+                            <th>Investment Gain %</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -68,26 +62,40 @@
                             <td><strong>{{ policy.policy_name }}</strong></td>
                             <td>{{ policy.provider }}</td>
                             <td>
-                                ₹{{ "{:,.2f}".format(policy.premium_amount) }}
+                                ₹{{ "{:,.2f}".format(policy.premium_amount)|format_indian_rupee }}
                                 <small>{{ policy.premium_frequency|replace('_', ' ')|title }}</small>
                             </td>
-                            <td>{{ policy.start_date.isoformat() }}</td>
+                            <td>{{ policy.start_date|format_date_dd_mm_yyyy }}</td>
                             <td>
-                                {% if policy.last_payment_date %}
-                                {{ policy.last_payment_date.isoformat() }}
+                                {% if policy.last_premium_payment_date %}
+                                {{ policy.last_premium_payment_date|format_date_dd_mm_yyyy }}
                                 {% else %}
                                 —
                                 {% endif %}
                             </td>
                             <td>
                                 {% if policy.total_premium_for_term is not none %}
-                                ₹{{ "{:,.2f}".format(policy.total_premium_for_term) }}
+                                ₹{{ "{:,.2f}".format(policy.total_premium_for_term)|format_indian_rupee }}
                                 <small>
-                                    Remaining: ₹{{ "{:,.2f}".format(policy.remaining_premium_for_term or 0) }}
+                                    Remaining: ₹{{ "{:,.2f}".format(policy.remaining_premium_for_term or 0)|format_indian_rupee }}
                                 </small>
+                                {% if policy.next_premium_date %}
+                                <small>
+                                    Next Premium: {{ policy.next_premium_date|format_date_dd_mm_yyyy }}
+                                </small>
+                                {% endif %}
                                 {% else %}
                                 —
                                 <small>Remaining: —</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if policy.compute_investment_gain and policy.investment_gain_percent is not none %}
+                                <span class="{% if policy.investment_gain_percent >= 0 %}profit{% else %}loss{% endif %}">
+                                    {{ "{:+.2f}".format(policy.investment_gain_percent) }}%
+                                </span>
+                                {% else %}
+                                —
                                 {% endif %}
                             </td>
                             <td>
@@ -105,19 +113,18 @@
                             </td>
                         </tr>
                         <tr id="policy-details-{{ policy.id }}" class="insurance-detail-row" style="display:none;">
-                            <td colspan="9">
+                            <td colspan="10">
                                 <div class="insurance-detail-panel">
                                     <div class="insurance-detail-grid">
                                         <div><span>Policy Number</span><strong>{{ policy.policy_number }}</strong></div>
                                         <div><span>Policy Type</span><strong>{{ policy.policy_type|replace('_', ' ')|title }}</strong></div>
                                         <div><span>Insured Person</span><strong>{{ policy.insured_person }}</strong></div>
                                         <div><span>Nominee</span><strong>{{ policy.nominee or "—" }}</strong></div>
-                                        <div><span>Maturity Date</span><strong>{% if policy.maturity_date %}{{ policy.maturity_date.isoformat() }}{% else %}—{% endif %}</strong></div>
+                                        <div><span>Maturity Date</span><strong>{% if policy.maturity_date %}{{ policy.maturity_date|format_date_dd_mm_yyyy }}{% else %}—{% endif %}</strong></div>
                                         <div><span>Policy Term</span><strong>{% if policy.policy_term_years is not none %}{{ policy.policy_term_years }} years{% else %}—{% endif %}</strong></div>
-                                        <div><span>Tax Section</span><strong>{{ policy.tax_section or "—" }}</strong></div>
-                                        <div><span>Sum Assured</span><strong>{% if policy.sum_assured %}₹{{ "{:,.2f}".format(policy.sum_assured) }}{% else %}—{% endif %}</strong></div>
-                                        <div><span>Current Value</span><strong>{% if policy.current_value is not none %}₹{{ "{:,.2f}".format(policy.current_value) }}{% else %}—{% endif %}</strong></div>
-                                        <div><span>Last Payment Date</span><strong>{% if policy.last_payment_date %}{{ policy.last_payment_date.isoformat() }}{% else %}—{% endif %}</strong></div>
+                                        <div><span>Sum Assured</span><strong>{% if policy.sum_assured %}₹{{ "{:,.2f}".format(policy.sum_assured)|format_indian_rupee }}{% else %}—{% endif %}</strong></div>
+                                        <div><span>Maturity Benefit Value</span><strong>{% if policy.maturity_benefit_value is not none %}₹{{ "{:,.2f}".format(policy.maturity_benefit_value)|format_indian_rupee }}{% else %}—{% endif %}</strong></div>
+                                        <div><span>Last Premium Payment Date</span><strong>{% if policy.last_premium_payment_date %}{{ policy.last_premium_payment_date|format_date_dd_mm_yyyy }}{% else %}—{% endif %}</strong></div>
                                         <div><span>Total Premium Paid</span><strong>₹{{ "{:,.2f}".format(policy.total_premium_paid) }}</strong></div>
                                         <div><span>Notes</span><strong>{{ policy.notes or "—" }}</strong></div>
                                     </div>
@@ -174,8 +181,8 @@
                     <input id="policy_number" name="policy_number" data-label="Policy Number" type="text" maxlength="60" required>
                 </div>
                 <div class="form-group">
-                    <label for="tax_section">Tax Section <small>(optional)</small></label>
-                    <input id="tax_section" name="tax_section" type="text" maxlength="20" placeholder="80C / 80D">
+                    <label class="required-label" for="policy_term">Policy Term</label>
+                    <input id="policy_term" name="policy_term" data-label="Policy Term" type="number" min="1" maxlength="60" required>
                 </div>
             </div>
 
@@ -193,7 +200,11 @@
             <div class="form-row">
                 <div class="form-group">
                     <label class="required-label" for="premium_amount">Premium Amount (₹)</label>
-                    <input id="premium_amount" name="premium_amount" data-label="Premium Amount" type="number" min="0.01" step="0.01" required>
+                    <input id="premium_amount" name="premium_amount" data-label="Premium Amount" type="number" min="100" step="100" required>
+                </div>
+                <div class="form-group">
+                    <label class="required-label" for="total_premium_amount">Total Premium Amount (₹)</label>
+                    <input id="total_premium_amount" name="total_premium_amount" data-label="Total Premium Amount" type="number" min="100" step="100" required>
                 </div>
                 <div class="form-group">
                     <label class="required-label" for="premium_frequency">Premium Frequency</label>
@@ -205,6 +216,10 @@
                         <option value="single">Single</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label class="required-label" for="last_premium_payment_date">Last Premium Payment Date</label>
+                    <input id="last_premium_payment_date" name="last_premium_payment_date" data-label="Last Premium Payment Date" type="date" required>
+                </div>
             </div>
 
             <div class="form-row">
@@ -213,8 +228,8 @@
                     <input id="sum_assured" name="sum_assured" type="number" min="0" step="0.01">
                 </div>
                 <div class="form-group">
-                    <label for="current_value">Current / Surrender Value (₹) <small>(optional)</small></label>
-                    <input id="current_value" name="current_value" type="number" min="0" step="0.01">
+                    <label for="maturity_benefit_value">Maturity Benefit Value (₹) <small>(optional)</small></label>
+                    <input id="maturity_benefit_value" name="maturity_benefit_value" type="number" min="0" step="0.01">
                 </div>
             </div>
 
@@ -227,6 +242,16 @@
                     <label for="nominee">Nominee <small>(optional)</small></label>
                     <input id="nominee" name="nominee" type="text" maxlength="100">
                 </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="checkbox-inline" for="compute_investment_gain">
+                        <input id="compute_investment_gain" name="compute_investment_gain" type="checkbox" value="true">
+                        Compute Investment Gain %
+                    </label>
+                </div>
+                <div class="form-group"></div>
             </div>
 
             <div class="form-row">
@@ -279,10 +304,7 @@
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group">
-                    <label for="tax_claim_amount">Tax Claim Amount (₹) <small>(optional)</small></label>
-                    <input id="tax_claim_amount" name="tax_claim_amount" type="number" min="0" step="0.01">
-                </div>
+                <div class="form-group"></div>
                 <div class="form-group">
                     <label for="payment_notes">Notes <small>(optional)</small></label>
                     <input id="payment_notes" name="notes" type="text" maxlength="255">
@@ -322,6 +344,35 @@
 {% block extra_scripts %}
 <script>
 (function () {
+    // Format date from YYYY-MM-DD or any date format to DD/MM/YYYY
+    function formatDateDDMMYYYY(dateStr) {
+        if (!dateStr) return '';
+        var date = new Date(dateStr + 'T00:00:00');
+        var day = String(date.getDate()).padStart(2, '0');
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var year = date.getFullYear();
+        return day + '/' + month + '/' + year;
+    }
+
+    // Format amount to Indian rupee format (x,xx,xx,xxx)
+    function formatIndianRupee(amount) {
+        if (amount === null || amount === undefined || isNaN(amount)) return '0.00';
+        var num = Math.abs(Number(amount)).toFixed(2);
+        var parts = num.split('.');
+        var intPart = parts[0];
+        var decPart = parts[1];
+        if (intPart.length <= 3) {
+            return intPart + '.' + decPart;
+        }
+        var lastThree = intPart.substring(intPart.length - 3);
+        var remaining = intPart.substring(0, intPart.length - 3);
+        var formatted = remaining.replace(/(\d)(?=(\d{2})+(?!\d))/g, '$1,') + ',' + lastThree;
+        return formatted + '.' + decPart;
+    }
+
+        // Global formatting functions are now in /static/js/formatting.js
+        // Use formatDateDDMMYYYY(), formatIndianRupee(), convertToDateInputFormat() globally
+
     var policyModal = document.getElementById('insurancePolicyModal');
     var paymentModal = document.getElementById('insurancePaymentModal');
     var historyModal = document.getElementById('insurancePaymentHistoryModal');
@@ -378,14 +429,27 @@
         }
     }
 
+    function convertToDateInputFormat(dateStr) {
+        if (!dateStr) return '';
+        var date = new Date(dateStr + 'T00:00:00');
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    }
+
     function openPolicyModalForAdd() {
         policyForm.reset();
         policyEditId.value = '';
         setPolicyMode(false);
         renderErrors(policyErrors, []);
         var startDate = document.getElementById('start_date');
+        var lastPremiumDate = document.getElementById('last_premium_payment_date');
         if (startDate) {
             startDate.valueAsDate = new Date();
+        }
+        if (lastPremiumDate) {
+            lastPremiumDate.valueAsDate = new Date();
         }
         policyModal.style.display = 'flex';
     }
@@ -408,13 +472,16 @@
         document.getElementById('policy_category').value = data.policy_category || 'other';
         document.getElementById('policy_type').value = data.policy_type || '';
         document.getElementById('policy_number').value = data.policy_number || '';
-        document.getElementById('tax_section').value = data.tax_section || '';
-        document.getElementById('start_date').value = data.start_date || '';
-        document.getElementById('maturity_date').value = data.maturity_date || '';
-        document.getElementById('premium_amount').value = data.premium_amount != null ? data.premium_amount : '';
+        document.getElementById('policy_term').value = data.policy_term != null ? data.policy_term : '';
+        document.getElementById('last_premium_payment_date').value = convertToDateInputFormat(data.last_premium_payment_date) || '';
+        document.getElementById('start_date').value = convertToDateInputFormat(data.start_date) || '';
+        document.getElementById('maturity_date').value = convertToDateInputFormat(data.maturity_date) || '';
+        document.getElementById('premium_amount').value = data.premium_amount != null ? parseFloat(data.premium_amount).toFixed(2) : '';
+        document.getElementById('total_premium_amount').value = data.total_premium_amount != null ? parseFloat(data.total_premium_amount).toFixed(2) : '';
         document.getElementById('premium_frequency').value = data.premium_frequency || 'yearly';
-        document.getElementById('sum_assured').value = data.sum_assured != null ? data.sum_assured : '';
-        document.getElementById('current_value').value = data.current_value != null ? data.current_value : '';
+        document.getElementById('sum_assured').value = data.sum_assured != null ? parseFloat(data.sum_assured).toFixed(2) : '';
+        document.getElementById('maturity_benefit_value').value = data.maturity_benefit_value != null ? parseFloat(data.maturity_benefit_value).toFixed(2) : '';
+        document.getElementById('compute_investment_gain').checked = !!data.compute_investment_gain;
         document.getElementById('insured_person').value = data.insured_person || '';
         document.getElementById('nominee').value = data.nominee || '';
         document.getElementById('policy_notes').value = data.notes || '';
@@ -481,23 +548,19 @@
         }
 
         var html = '<p class="insurance-history-total"><strong>Total Paid:</strong> ₹'
-            + Number(data.total_paid).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+            + formatIndianRupee(data.total_paid)
             + '</p>';
 
         html += '<div class="insurance-table-wrap"><table class="data-table"><thead><tr>'
-            + '<th>Date</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Tax Claim</th><th>Notes</th>'
+            + '<th>Date</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Notes</th>'
             + '</tr></thead><tbody>';
 
         data.payments.forEach(function (payment) {
-            var tax = payment.tax_claim_amount !== null && payment.tax_claim_amount !== undefined
-                ? '₹' + Number(payment.tax_claim_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })
-                : '—';
             html += '<tr>'
-                + '<td>' + payment.date + '</td>'
-                + '<td>₹' + Number(payment.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 }) + '</td>'
+                + '<td>' + formatDateDDMMYYYY(payment.date) + '</td>'
+                + '<td>₹' + formatIndianRupee(payment.amount) + '</td>'
                 + '<td>' + (payment.payment_mode || '—') + '</td>'
                 + '<td>' + (payment.reference_no || '—') + '</td>'
-                + '<td>' + tax + '</td>'
                 + '<td>' + (payment.notes || '—') + '</td>'
                 + '</tr>';
         });
@@ -634,6 +697,6 @@
             closeWarningModal();
         }
     });
-}());
+})();
 </script>
 {% endblock %}
