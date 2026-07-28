@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Users Management{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>👥 User Management</h2>
+        <p class="subtitle">Total Users: <strong>{{ total_users }}</strong></p>
+    </div>
+    
+    <!-- Add New User Form -->
+    <div class="add-user-section">
+        <h3>➕ Create New User</h3>
+        <form method="post" action="/admin/user" class="add-user-form" id="addUserForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        name="username" 
+                        placeholder="e.g., john_doe" 
+                        required
+                        autocomplete="off"
+                    />
+                    <small>3+ chars, lowercase, no spaces</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="display_name">Display Name</label>
+                    <input 
+                        type="text" 
+                        id="display_name" 
+                        name="display_name" 
+                        placeholder="e.g., John Doe" 
+                        required
+                    />
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        placeholder="Enter password" 
+                        required
+                        autocomplete="new-password"
+                    />
+                    <small>4-72 characters</small>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Create User</button>
+                <button type="reset" class="btn btn-secondary">Clear</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Users List -->
+    <div class="users-section">
+        <h3>📋 All Users</h3>
+        {% if users %}
+        <div class="admin-table-wrapper">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Display Name</th>
+                    <th>Status</th>
+                    <th>Admin</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr class="{% if not user.is_active %}inactive-row{% endif %}">
+                    <td class="user-id">{{ user.id }}</td>
+                    <td class="user-username">
+                        <strong>{{ user.username }}</strong>
+                        {% if user.id == current_user.id %}
+                        <span class="badge-you">(You)</span>
+                        {% endif %}
+                    </td>
+                    <td class="user-display">{{ user.display_name }}</td>
+                    <td class="user-status">
+                        {% if user.is_active %}
+                        <span class="status-badge active">✓ Active</span>
+                        {% else %}
+                        <span class="status-badge inactive">✗ Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="user-admin">
+                        {% if user.is_admin %}
+                        <span class="admin-badge">⚙️ Admin</span>
+                        {% else %}
+                        <span class="user-badge">👤 User</span>
+                        {% endif %}
+                    </td>
+                    <td class="user-created">{{ user.created_at | format_date_dd_mm_yyyy }}</td>
+                    <td class="user-actions">
+                        {% if user.id != current_user.id %}
+                        <form method="post" style="display: inline;">
+                            <button 
+                                formaction="/admin/user/{{ user.id }}/toggle-admin" 
+                                class="btn-action btn-admin"
+                                title="Toggle admin status"
+                            >
+                                {% if user.is_admin %}🔓{% else %}🔒{% endif %}
+                            </button>
+                        </form>
+                        <form method="post" style="display: inline;">
+                            <button 
+                                formaction="/admin/user/{{ user.id }}/toggle-active" 
+                                class="btn-action {% if user.is_active %}btn-deactivate{% else %}btn-activate{% endif %}"
+                                title="Toggle active status"
+                            >
+                                {% if user.is_active %}🚫{% else %}✓{% endif %}
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No users found</p>
+    </div>
+    {% endif %}
+    </div>
+</div>
+
+<style>
+.admin-container {
+    padding: 2rem;
+    max-width: 1200px;
+}
+
+.admin-header {
+    margin-bottom: 2rem;
+}
+
+.admin-header h2 {
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+/* Add User Form Styles */
+.add-user-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.add-user-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.add-user-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 600px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.form-group input {
+    padding: 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+}
+
+.form-group small {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.btn {
+    padding: 0.7rem 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: rgb(0, 0, 0);
+    color: rgb(255, 255, 255);
+    border-color: rgb(0, 0, 0);
+}
+
+.btn-primary:hover {
+    background: rgb(0, 0, 0);
+    opacity: 0.9;
+}
+
+.btn-secondary {
+    background:rgb(0, 0, 0);
+    color: rgb(255, 255, 255);
+    border-color: rgb(0, 0, 0);
+}
+
+.btn-secondary:hover {
+    background: rgb(0, 0, 0);
+}
+
+/* Users List Section */
+.users-section {
+    margin-top: 2rem;
+}
+
+.users-section h3 {
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.admin-table-wrapper {
+    overflow-x: auto;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-secondary);
+}
+
+.admin-table thead {
+    background: var(--bg-tertiary);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.admin-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.admin-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s;
+}
+
+.admin-table tbody tr:hover {
+    background: var(--bg-tertiary);
+}
+
+.admin-table tbody tr.inactive-row {
+    opacity: 0.6;
+}
+
+.admin-table td {
+    padding: 1rem;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.user-id {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.user-username {
+    font-family: monospace;
+    color: var(--accent-primary);
+}
+
+.badge-you {
+    display: inline-block;
+    background: var(--accent-primary);
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-badge.active {
+    background: rgba(76, 175, 80, 0.2);
+    color: var(--success-color, #4caf50);
+}
+
+.status-badge.inactive {
+    background: rgba(244, 67, 54, 0.2);
+    color: var(--danger-color, #f44336);
+}
+
+.admin-badge {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    background: rgba(33, 150, 243, 0.2);
+    color: var(--accent-primary);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.user-badge {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    background: rgba(158, 158, 158, 0.2);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.user-created {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.user-actions {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.btn-action {
+    display: inline-block;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    margin: 0 0.25rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-action:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-primary);
+}
+
+.btn-admin:hover {
+    background: rgba(33, 150, 243, 0.1);
+    border-color: var(--accent-primary);
+}
+
+.btn-deactivate:hover {
+    background: rgba(244, 67, 54, 0.1);
+    border-color: #f44336;
+}
+
+.btn-activate:hover {
+    background: rgba(76, 175, 80, 0.1);
+    border-color: #4caf50;
+}
+
+.text-muted {
+    color: var(--text-secondary);
+}
+
+.empty-state {
+    padding: 3rem 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+</style>
+{% endblock %}
