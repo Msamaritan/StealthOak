@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import InsurancePolicy, InsurancePremiumPayment
+from app.models import InsurancePolicy, InsurancePremiumPayment, User
+from app.routers.auth import get_current_user
 from app.utils import get_configured_templates
 
 
@@ -182,10 +183,15 @@ def _parse_policy_form(form, errors: List[str]) -> Dict[str, Optional[object]]:
 
 
 @router.get("", response_class=HTMLResponse)
-async def insurance_page(request: Request, db: AsyncSession = Depends(get_db)):
+async def insurance_page(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
         select(InsurancePolicy)
         .options(selectinload(InsurancePolicy.premium_payments))
+        .where(InsurancePolicy.user_id == current_user.id)
         .order_by(
             InsurancePolicy.policy_category.asc(),
             InsurancePolicy.provider.asc(),
@@ -213,6 +219,7 @@ async def insurance_page(request: Request, db: AsyncSession = Depends(get_db)):
         "insurance.html",
         {
             "request": request,
+            "current_user": current_user,
             "policies": policies,
             "policies_by_category": policies_by_category,
             "category_labels": CATEGORY_LABELS,
@@ -224,7 +231,11 @@ async def insurance_page(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/policy")
-async def add_insurance_policy(request: Request, db: AsyncSession = Depends(get_db)):
+async def add_insurance_policy(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     form = await request.form()
     errors: List[str] = []
     payload = _parse_policy_form(form, errors)
@@ -232,6 +243,7 @@ async def add_insurance_policy(request: Request, db: AsyncSession = Depends(get_
     if errors:
         return JSONResponse({"success": False, "errors": errors}, status_code=400)
 
+    payload["user_id"] = current_user.id
     policy = InsurancePolicy(**payload)
     db.add(policy)
     await db.flush()
@@ -240,8 +252,17 @@ async def add_insurance_policy(request: Request, db: AsyncSession = Depends(get_
 
 
 @router.get("/policy/{policy_id}")
-async def get_policy(policy_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(InsurancePolicy).where(InsurancePolicy.id == policy_id))
+async def get_policy(
+    policy_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(InsurancePolicy).where(
+            InsurancePolicy.id == policy_id,
+            InsurancePolicy.user_id == current_user.id
+        )
+    )
     policy = result.scalar_one_or_none()
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
@@ -274,9 +295,15 @@ async def get_policy(policy_id: int, db: AsyncSession = Depends(get_db)):
 async def update_policy(
     policy_id: int,
     request: Request,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(InsurancePolicy).where(InsurancePolicy.id == policy_id))
+    result = await db.execute(
+        select(InsurancePolicy).where(
+            InsurancePolicy.id == policy_id,
+            InsurancePolicy.user_id == current_user.id
+        )
+    )
     policy = result.scalar_one_or_none()
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
@@ -296,8 +323,17 @@ async def update_policy(
 
 
 @router.delete("/policy/{policy_id}")
-async def delete_policy(policy_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(InsurancePolicy).where(InsurancePolicy.id == policy_id))
+async def delete_policy(
+    policy_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(InsurancePolicy).where(
+            InsurancePolicy.id == policy_id,
+            InsurancePolicy.user_id == current_user.id
+        )
+    )
     policy = result.scalar_one_or_none()
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
@@ -310,9 +346,15 @@ async def delete_policy(policy_id: int, db: AsyncSession = Depends(get_db)):
 async def add_policy_payment(
     policy_id: int,
     request: Request,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(InsurancePolicy).where(InsurancePolicy.id == policy_id))
+    result = await db.execute(
+        select(InsurancePolicy).where(
+            InsurancePolicy.id == policy_id,
+            InsurancePolicy.user_id == current_user.id
+        )
+    )
     policy = result.scalar_one_or_none()
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
@@ -350,11 +392,18 @@ async def add_policy_payment(
 
 
 @router.get("/policy/{policy_id}/payments")
-async def list_policy_payments(policy_id: int, db: AsyncSession = Depends(get_db)):
+async def list_policy_payments(
+    policy_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
         select(InsurancePolicy)
         .options(selectinload(InsurancePolicy.premium_payments))
-        .where(InsurancePolicy.id == policy_id)
+        .where(
+            InsurancePolicy.id == policy_id,
+            InsurancePolicy.user_id == current_user.id
+        )
     )
     policy = result.scalar_one_or_none()
     if not policy:

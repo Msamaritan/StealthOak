@@ -11,7 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Holding, Portfolio
+from app.models import Holding, Portfolio, User
+from app.routers.auth import get_current_user
 from app.schemas import HoldingCreate
 from app.services.price_fetcher import price_fetcher
 from app.services.portfolio_stats import portfolio_stats
@@ -47,11 +48,12 @@ def _stocks_market_cards() -> List[dict]:
     ]
 
 
-def _render_market_selector(request: Request):
+def _render_market_selector(request: Request, current_user: User):
     return templates.TemplateResponse(
         "market_selector.html",
         {
             "request": request,
+            "current_user": current_user,
             "page_title": "Stocks Markets",
             "heading": "Stocks",
             "description": "Choose the market you want to manage.",
@@ -60,11 +62,12 @@ def _render_market_selector(request: Request):
     )
 
 
-def _render_foreign_market_page(request: Request):
+def _render_foreign_market_page(request: Request, current_user: User):
     return templates.TemplateResponse(
         "market_placeholder.html",
         {
             "request": request,
+            "current_user": current_user,
             "page_title": "Foreign Stocks",
             "heading": "Foreign Stocks",
             "description": "Template-only view for overseas holdings.",
@@ -97,21 +100,30 @@ def _render_foreign_market_page(request: Request):
 # ----------------------------------------
 
 @router.get("", response_class=HTMLResponse)
-async def stocks_market_page(request: Request):
+async def stocks_market_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
     """Stocks market landing page."""
-    return _render_market_selector(request)
+    return _render_market_selector(request, current_user)
 
 
 @router.get("/india", response_class=HTMLResponse)
 @router.get("/indian", response_class=HTMLResponse)
 async def indian_stocks_page(
     request: Request,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Indian stocks listing page."""
-    # Query only stocks
+    # Query only stocks for this user
     result = await db.execute(
-        select(Holding).where(Holding.asset_type == "stock")
+        select(Holding)
+        .join(Portfolio)
+        .where(
+            Holding.asset_type == "stock",
+            Portfolio.user_id == current_user.id
+        )
     )
     holdings: List[Holding] = list(result.scalars().all())
     
@@ -124,38 +136,52 @@ async def indian_stocks_page(
         "stocks/list.html",
         {
             "request": request,
+            "current_user": current_user,
             "stocks": enriched,
         }
     )
 
 
 @router.get("/foreign", response_class=HTMLResponse)
-async def foreign_stocks_page(request: Request):
+async def foreign_stocks_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
     """Foreign stocks landing page placeholder."""
-    return _render_foreign_market_page(request)
+    return _render_foreign_market_page(request, current_user)
 
 
 @router.get("/add", response_class=HTMLResponse)
-async def add_stock_page(request: Request):
+async def add_stock_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
     """
     Add stock form page.
     """
     return templates.TemplateResponse(
         "stocks/add.html",
-        {"request": request}
+        {
+            "request": request,
+            "current_user": current_user,
+        }
     )
 
 @router.get("/edit/{holding_id}", response_class=HTMLResponse)
 async def edit_stock_page(
     request: Request,
     holding_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Edit stock form page."""
     result = await db.execute(
-        select(Holding).where(
+        select(Holding)
+        .join(Portfolio)
+        .where(
             Holding.id == holding_id,
-            Holding.asset_type == "stock"
+            Holding.asset_type == "stock",
+            Portfolio.user_id == current_user.id
         )
     )
     holding = result.scalar_one_or_none()
@@ -167,6 +193,7 @@ async def edit_stock_page(
         "stocks/edit.html",
         {
             "request": request,
+            "current_user": current_user,
             "holding": holding,
         }
     )
@@ -175,13 +202,17 @@ async def edit_stock_page(
 async def update_stock_form(
     request: Request,
     holding_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Handle stock edit form submission."""
     result = await db.execute(
-        select(Holding).where(
+        select(Holding)
+        .join(Portfolio)
+        .where(
             Holding.id == holding_id,
-            Holding.asset_type == "stock"
+            Holding.asset_type == "stock",
+            Portfolio.user_id == current_user.id
         )
     )
     holding = result.scalar_one_or_none()
@@ -215,6 +246,7 @@ async def update_stock_form(
             "stocks/edit.html",
             {
                 "request": request,
+                "current_user": current_user,
                 "holding": holding,
                 "errors": errors,
             }
@@ -255,6 +287,7 @@ async def search_stocks(q: str = ""):
 @router.post("/api", status_code=status.HTTP_201_CREATED)
 async def create_stock(
     stock_data: HoldingCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -284,14 +317,21 @@ async def create_stock(
             detail="Exchange (NSE/BSE) is required for stocks"
         )
     
-    # Get or create default portfolio
+    # Get or create default portfolio for this user
     result = await db.execute(
-        select(Portfolio).where(Portfolio.owner == "Self")
+        select(Portfolio).where(
+            Portfolio.owner == "Self",
+            Portfolio.user_id == current_user.id
+        )
     )
     portfolio = result.scalar_one_or_none()
     
     if not portfolio:
-        portfolio = Portfolio(name="Main Portfolio", owner="Self")
+        portfolio = Portfolio(
+            name="Main Portfolio",
+            owner="Self",
+            user_id=current_user.id
+        )
         db.add(portfolio)
         await db.flush()  # Get the ID
     

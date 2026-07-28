@@ -11,7 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Holding, Portfolio
+from app.models import Holding, Portfolio, User
+from app.routers.auth import get_current_user
 from app.schemas import HoldingCreate
 from app.services.price_fetcher import price_fetcher
 from app.services.portfolio_stats import portfolio_stats
@@ -47,11 +48,12 @@ def _mutual_fund_market_cards() -> List[dict]:
     ]
 
 
-def _render_market_selector(request: Request):
+def _render_market_selector(request: Request, current_user: User):
     return templates.TemplateResponse(
         "market_selector.html",
         {
             "request": request,
+            "current_user": current_user,
             "page_title": "Mutual Fund Markets",
             "heading": "Mutual Funds",
             "description": "Choose the market you want to manage.",
@@ -60,11 +62,12 @@ def _render_market_selector(request: Request):
     )
 
 
-def _render_foreign_market_page(request: Request):
+def _render_foreign_market_page(request: Request, current_user: User):
     return templates.TemplateResponse(
         "market_placeholder.html",
         {
             "request": request,
+            "current_user": current_user,
             "page_title": "Foreign Mutual Funds",
             "heading": "Foreign Mutual Funds",
             "description": "Template-only view for overseas fund holdings.",
@@ -97,20 +100,29 @@ def _render_foreign_market_page(request: Request):
 # ----------------------------------------
 
 @router.get("", response_class=HTMLResponse)
-async def mutualfunds_market_page(request: Request):
+async def mutualfunds_market_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
     """Mutual funds market landing page."""
-    return _render_market_selector(request)
+    return _render_market_selector(request, current_user)
 
 
 @router.get("/india", response_class=HTMLResponse)
 @router.get("/indian", response_class=HTMLResponse)
 async def indian_mutualfunds_page(
     request: Request,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Indian mutual funds listing page."""
     result = await db.execute(
-        select(Holding).where(Holding.asset_type == "mutual_fund")
+        select(Holding)
+        .join(Portfolio)
+        .where(
+            Holding.asset_type == "mutual_fund",
+            Portfolio.user_id == current_user.id
+        )
     )
     holdings: List[Holding] = list(result.scalars().all())
     
@@ -122,38 +134,52 @@ async def indian_mutualfunds_page(
         "mutualfunds/list.html",
         {
             "request": request,
+            "current_user": current_user,
             "mutual_funds": enriched,
         }
     )
 
 
 @router.get("/foreign", response_class=HTMLResponse)
-async def foreign_mutualfunds_page(request: Request):
+async def foreign_mutualfunds_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
     """Foreign mutual funds landing page placeholder."""
-    return _render_foreign_market_page(request)
+    return _render_foreign_market_page(request, current_user)
 
 
 @router.get("/add", response_class=HTMLResponse)
-async def add_mutualfund_page(request: Request):
+async def add_mutualfund_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
     """
     Add mutual fund form page with search functionality.
     """
     return templates.TemplateResponse(
         "mutualfunds/add.html",
-        {"request": request}
+        {
+            "request": request,
+            "current_user": current_user,
+        }
     )
 
 @router.get("/edit/{holding_id}", response_class=HTMLResponse)
 async def edit_mutualfund_page(
     request: Request,
     holding_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Edit mutual fund form page."""
     result = await db.execute(
-        select(Holding).where(
+        select(Holding)
+        .join(Portfolio)
+        .where(
             Holding.id == holding_id,
-            Holding.asset_type == "mutual_fund"
+            Holding.asset_type == "mutual_fund",
+            Portfolio.user_id == current_user.id
         )
     )
     holding = result.scalar_one_or_none()
@@ -165,6 +191,7 @@ async def edit_mutualfund_page(
         "mutualfunds/edit.html",
         {
             "request": request,
+            "current_user": current_user,
             "holding": holding,
         }
     )
@@ -174,13 +201,17 @@ async def edit_mutualfund_page(
 async def update_mutualfund_form(
     request: Request,
     holding_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Handle mutual fund edit form submission."""
     result = await db.execute(
-        select(Holding).where(
+        select(Holding)
+        .join(Portfolio)
+        .where(
             Holding.id == holding_id,
-            Holding.asset_type == "mutual_fund"
+            Holding.asset_type == "mutual_fund",
+            Portfolio.user_id == current_user.id
         )
     )
     holding = result.scalar_one_or_none()
@@ -214,6 +245,7 @@ async def update_mutualfund_form(
             "mutualfunds/edit.html",
             {
                 "request": request,
+                "current_user": current_user,
                 "holding": holding,
                 "errors": errors,
             }
@@ -251,6 +283,7 @@ async def search_mutual_funds(q: str = ""):
 @router.post("/api", status_code=status.HTTP_201_CREATED)
 async def create_mutualfund(
     mf_data: HoldingCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -271,14 +304,21 @@ async def create_mutualfund(
             detail="Asset type must be 'mutual_fund'"
         )
     
-    # Get or create default portfolio
+    # Get or create default portfolio for this user
     result = await db.execute(
-        select(Portfolio).where(Portfolio.owner == "Self")
+        select(Portfolio).where(
+            Portfolio.owner == "Self",
+            Portfolio.user_id == current_user.id
+        )
     )
     portfolio = result.scalar_one_or_none()
     
     if not portfolio:
-        portfolio = Portfolio(name="Main Portfolio", owner="Self")
+        portfolio = Portfolio(
+            name="Main Portfolio",
+            owner="Self",
+            user_id=current_user.id
+        )
         db.add(portfolio)
         await db.flush()
     

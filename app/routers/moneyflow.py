@@ -13,6 +13,8 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.moneyflow import BankTransfer, BrokerCredit, MoneyFlowInvestment, ActiveSIP
+from app.models import User
+from app.routers.auth import get_current_user
 from app.services.price_fetcher import price_fetcher
 from app.schemas.moneyflow import (
     BankTransferCreate,
@@ -149,6 +151,7 @@ async def _existing_sip_allocated_holdings(
 @router.get("", response_class=HTMLResponse)
 async def moneyflow_page(
     request: Request,
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
     month: Optional[str] = Query(default=None, description="Filter by month: YYYY-MM")
 ):
@@ -178,6 +181,7 @@ async def moneyflow_page(
             selectinload(BankTransfer.broker_credits)
             .selectinload(BrokerCredit.investments)
         )
+        .where(BankTransfer.user_id == current_user.id)
         .order_by(BankTransfer.date.desc())
     )
     
@@ -198,7 +202,10 @@ async def moneyflow_page(
         broker_query = (
             select(BrokerCredit)
             .options(selectinload(BrokerCredit.investments))
-            .where(BrokerCredit.bank_transfer_id.in_(filtered_bank_ids))
+            .where(
+                BrokerCredit.bank_transfer_id.in_(filtered_bank_ids),
+                BrokerCredit.user_id == current_user.id
+            )
             .order_by(BrokerCredit.date.desc())
         )
     elif date_filter_start and date_filter_end:
@@ -212,6 +219,7 @@ async def moneyflow_page(
         broker_query = (
             select(BrokerCredit)
             .options(selectinload(BrokerCredit.investments))
+            .where(BrokerCredit.user_id == current_user.id)
             .order_by(BrokerCredit.date.desc())
         )
     
@@ -225,7 +233,10 @@ async def moneyflow_page(
     if filtered_broker_ids:
         investment_query = (
             select(MoneyFlowInvestment)
-            .where(MoneyFlowInvestment.broker_credit_id.in_(filtered_broker_ids))
+            .where(
+                MoneyFlowInvestment.broker_credit_id.in_(filtered_broker_ids),
+                MoneyFlowInvestment.user_id == current_user.id
+            )
             .order_by(MoneyFlowInvestment.date.desc())
         )
     elif date_filter_start and date_filter_end:
@@ -238,6 +249,7 @@ async def moneyflow_page(
         # No filter - get all
         investment_query = (
             select(MoneyFlowInvestment)
+            .where(MoneyFlowInvestment.user_id == current_user.id)
             .order_by(MoneyFlowInvestment.date.desc())
         )
     
@@ -245,13 +257,14 @@ async def moneyflow_page(
     investments = result.scalars().all()
 
     # Calculate summary WITH the same filters
-    summary = await _calculate_summary(session, date_filter_start, date_filter_end)
+    summary = await _calculate_summary(session, current_user.id, date_filter_start, date_filter_end)
 
     # Get available months for filter dropdown
     months_query = (
         select(
             func.strftime('%Y-%m', BankTransfer.date).label('month')
         )
+        .where(BankTransfer.user_id == current_user.id)
         .distinct()
         .order_by(func.strftime('%Y-%m', BankTransfer.date).desc())
     )
@@ -261,7 +274,10 @@ async def moneyflow_page(
     # Active SIPs for dropdown sections
     sip_query = (
         select(ActiveSIP)
-        .where(ActiveSIP.is_active == True)
+        .where(
+            ActiveSIP.is_active == True,
+            ActiveSIP.user_id == current_user.id
+        )
         .order_by(ActiveSIP.broker_name.asc(), ActiveSIP.holding_name.asc())
     )
     result = await session.execute(sip_query)
@@ -280,6 +296,7 @@ async def moneyflow_page(
 
     context = {
         "request": request,
+        "current_user": current_user,
         "bank_transfers": bank_transfers,
         "broker_credits": broker_credits,
         "investments": investments,
@@ -1613,13 +1630,14 @@ async def get_summary(
     return await _calculate_summary(session, date_start, date_end)
 
 
-async def _calculate_summary(session: AsyncSession, date_start: dt.date = None, date_end: dt.date = None) -> MoneyFlowSummary:
+async def _calculate_summary(session: AsyncSession, user_id: int, date_start: dt.date = None, date_end: dt.date = None) -> MoneyFlowSummary:
     """Helper function to calculate summary statistics with optional date filtering"""
     
     # Fetch all data with relationships
     bank_query = (
         select(BankTransfer)
         .options(selectinload(BankTransfer.broker_credits).selectinload(BrokerCredit.investments))
+        .where(BankTransfer.user_id == user_id)
     )
 
     if date_start and date_end:
@@ -1637,6 +1655,7 @@ async def _calculate_summary(session: AsyncSession, date_start: dt.date = None, 
     broker_query = (
         select(BrokerCredit)
         .options(selectinload(BrokerCredit.investments))
+        .where(BrokerCredit.user_id == user_id)
     )
     if filter_bank_ids:
         broker_query = broker_query.where(BrokerCredit.bank_transfer_id.in_(filter_bank_ids))
@@ -1650,7 +1669,7 @@ async def _calculate_summary(session: AsyncSession, date_start: dt.date = None, 
     # Get investment IDs from filtered broker credits
     filter_broker_ids = [bc.id for bc in broker_credits]
 
-    investment_query = select(MoneyFlowInvestment)
+    investment_query = select(MoneyFlowInvestment).where(MoneyFlowInvestment.user_id == user_id)
     if filter_broker_ids:
         investment_query = investment_query.where(MoneyFlowInvestment.broker_credit_id.in_(filter_broker_ids))
     elif date_start and date_end:

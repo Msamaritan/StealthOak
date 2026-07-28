@@ -12,7 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Holding, PPFBalance, PPFTransaction
+from app.models import Holding, Portfolio, PPFBalance, PPFTransaction, User
+from app.routers.auth import get_current_user
 from app.services.portfolio_stats import portfolio_stats
 from app.utils import get_configured_templates
 
@@ -34,20 +35,27 @@ SILVER_ETF_SYMBOLS: frozenset[str] = frozenset({
 })
 
 
-async def _get_or_create_ppf(db: AsyncSession) -> PPFBalance:
+async def _get_or_create_ppf(db: AsyncSession, user_id: int) -> PPFBalance:
     result = await db.execute(
-        select(PPFBalance).order_by(PPFBalance.id.asc()).limit(1)
+        select(PPFBalance)
+        .where(PPFBalance.user_id == user_id)
+        .order_by(PPFBalance.id.asc())
+        .limit(1)
     )
     ppf = result.scalar_one_or_none()
     if ppf is None:
-        ppf = PPFBalance(name="Primary PPF")
+        ppf = PPFBalance(name="Primary PPF", user_id=user_id)
         db.add(ppf)
         await db.flush()
     return ppf
 
 
-async def _build_wealth_context(db: AsyncSession) -> Dict:
-    result = await db.execute(select(Holding))
+async def _build_wealth_context(db: AsyncSession, user_id: int) -> Dict:
+    result = await db.execute(
+        select(Holding)
+        .join(Portfolio)
+        .where(Portfolio.user_id == user_id)
+    )
     holdings: List[Holding] = list(result.scalars().all())
 
     enriched = []
@@ -77,7 +85,7 @@ async def _build_wealth_context(db: AsyncSession) -> Dict:
         _val(h) for h in enriched if h.asset_type == "mutual_fund"
     )
 
-    ppf = await _get_or_create_ppf(db)
+    ppf = await _get_or_create_ppf(db, user_id)
     ppf_invested = ppf.invested_amount
     ppf_current = ppf.current_value
 
@@ -133,15 +141,21 @@ async def _build_wealth_context(db: AsyncSession) -> Dict:
 
 
 @router.get("", response_class=HTMLResponse)
-async def wealth_page(request: Request, db: AsyncSession = Depends(get_db)):
-    ctx = await _build_wealth_context(db)
+async def wealth_page(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    ctx = await _build_wealth_context(db, current_user.id)
     ctx["request"] = request
+    ctx["current_user"] = current_user
     return templates.TemplateResponse("wealth.html", ctx)
 
 
 @router.post("/ppf/transaction")
 async def add_ppf_transaction(
     request: Request,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     form = await request.form()
@@ -171,7 +185,7 @@ async def add_ppf_transaction(
     if errors:
         return JSONResponse({"success": False, "errors": errors}, status_code=400)
 
-    ppf = await _get_or_create_ppf(db)
+    ppf = await _get_or_create_ppf(db, current_user.id)
     txn = PPFTransaction(
         ppf_id=ppf.id,
         transaction_type=transaction_type,
@@ -184,9 +198,15 @@ async def add_ppf_transaction(
 
 
 @router.get("/ppf/transactions")
-async def get_ppf_transactions(db: AsyncSession = Depends(get_db)):
+async def get_ppf_transactions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
-        select(PPFBalance).order_by(PPFBalance.id.asc()).limit(1)
+        select(PPFBalance)
+        .where(PPFBalance.user_id == current_user.id)
+        .order_by(PPFBalance.id.asc())
+        .limit(1)
     )
     ppf = result.scalar_one_or_none()
     if not ppf or not ppf.transactions:

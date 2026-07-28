@@ -11,7 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Holding, Portfolio
+from app.models import Holding, Portfolio, User
+from app.routers.auth import get_current_user
 from app.services.portfolio_stats import portfolio_stats
 from app.utils import get_configured_templates
 
@@ -26,6 +27,7 @@ templates = get_configured_templates()
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -38,8 +40,12 @@ async def dashboard(
     - Stocks table
     - Mutual funds table
     """
-    # Get all holdings from database
-    result = await db.execute(select(Holding))
+    # Get all holdings for the current user
+    result = await db.execute(
+        select(Holding)
+        .join(Portfolio)
+        .where(Portfolio.user_id == current_user.id)
+    )
     holdings: List[Holding] = list(result.scalars().all())
     
     # If no holdings, show empty dashboard
@@ -48,6 +54,7 @@ async def dashboard(
             "dashboard.html",
             {
                 "request": request,
+                "current_user": current_user,
                 "summary": None,
                 "allocation": {"stock": 0, "mutual_fund": 0},
                 "top_holdings": [],
@@ -86,6 +93,7 @@ async def dashboard(
         "dashboard.html",
         {
             "request": request,
+            "current_user": current_user,
             "summary": summary,
             "allocation": allocation,
             "top_holdings": top_holdings,
@@ -97,6 +105,7 @@ async def dashboard(
 
 @router.get("/api/dashboard/stats")
 async def dashboard_stats_api(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -106,7 +115,11 @@ async def dashboard_stats_api(
     - AJAX refresh without page reload
     - Future mobile app
     """
-    result = await db.execute(select(Holding))
+    result = await db.execute(
+        select(Holding)
+        .join(Portfolio)
+        .where(Portfolio.user_id == current_user.id)
+    )
     holdings: List[Holding] = list(result.scalars().all())
     
     if not holdings:

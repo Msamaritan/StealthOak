@@ -4,14 +4,15 @@ Kite Router - Zerodha authentication routes
 import datetime as dt
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from app.database import get_db
-from app.models import Holding, KiteSession, Portfolio, SyncLog
+from app.models import Holding, KiteSession, Portfolio, SyncLog, User
+from app.routers.auth import get_current_user
 from app.services.kite_service import init_kite_service, get_kite_service
 from app.services.price_fetcher import price_fetcher
 
@@ -24,13 +25,18 @@ def _is_safe_internal_path(path: str) -> bool:
     return isinstance(path, str) and path.startswith("/") and not path.startswith("//")
 
 
-async def _get_or_create_default_portfolio(db: AsyncSession) -> Portfolio:
-    result = await db.execute(select(Portfolio).where(Portfolio.owner == "Self"))
+async def _get_or_create_default_portfolio(db: AsyncSession, user_id: int) -> Portfolio:
+    result = await db.execute(
+        select(Portfolio).where(
+            Portfolio.owner == "Self",
+            Portfolio.user_id == user_id
+        )
+    )
     portfolio = result.scalar_one_or_none()
     if portfolio:
         return portfolio
 
-    portfolio = Portfolio(name="Main Portfolio", owner="Self")
+    portfolio = Portfolio(name="Main Portfolio", owner="Self", user_id=user_id)
     db.add(portfolio)
     await db.flush()
     return portfolio
@@ -342,7 +348,7 @@ def _is_kite_auth_error(error_text: str, error_trace: str) -> bool:
     return any(marker in blob for marker in auth_markers)
 
 
-async def _get_authenticated_kite(db: AsyncSession):
+async def _get_authenticated_kite(db: AsyncSession, user_id: int):
     """Return an authenticated Kite service from memory or persisted session."""
     kite = get_kite_service()
     if kite and getattr(kite, "access_token", None):
@@ -350,7 +356,10 @@ async def _get_authenticated_kite(db: AsyncSession):
 
     result = await db.execute(
         select(KiteSession)
-        .where(KiteSession.is_active.is_(True))
+        .where(
+            KiteSession.is_active.is_(True),
+            KiteSession.user_id == user_id
+        )
         .order_by(KiteSession.updated_at.desc())
         .limit(1)
     )
@@ -368,7 +377,10 @@ async def _get_authenticated_kite(db: AsyncSession):
 
 
 @router.get("/login")
-def kite_login(next: str = "/"):
+def kite_login(
+    current_user: User = Depends(get_current_user),
+    next: str = "/"
+):
     """Redirect user to Zerodha login page"""
     global _post_login_redirect_path
     _post_login_redirect_path = next if _is_safe_internal_path(next) else "/"
@@ -391,6 +403,7 @@ def kite_login(next: str = "/"):
 async def kite_callback(
     request_token: str = None,
     status: str = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Handle Zerodha OAuth callback"""
@@ -410,7 +423,10 @@ async def kite_callback(
         # Exchange request_token for access_token
         session = kite.generate_session(request_token)
 
-        result = await db.execute(select(KiteSession).where(KiteSession.is_active.is_(True)))
+        result = await db.execute(select(KiteSession).where(
+            KiteSession.is_active.is_(True),
+            KiteSession.user_id == current_user.id
+        ))
         active_sessions = list(result.scalars().all())
         for active_session in active_sessions:
             active_session.is_active = False
@@ -420,7 +436,7 @@ async def kite_callback(
                 api_key=settings.kite_api_key,
                 api_secret=settings.kite_api_secret,
                 access_token=session.get("access_token"),
-                user_id=session.get("user_id"),
+                user_id=current_user.id,
                 login_time=session.get("login_time"),
                 is_active=True,
             )
@@ -450,6 +466,7 @@ async def kite_callback(
 @router.get("/sync/{asset_kind}")
 async def sync_kite_holdings(
     asset_kind: str,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -463,7 +480,7 @@ async def sync_kite_holdings(
     route_self = f"/kite/sync/{asset_kind}"
 
     try:
-        kite = await _get_authenticated_kite(db)
+        kite = await _get_authenticated_kite(db, current_user.id)
     except HTTPException as ex:
         if ex.status_code == 401:
             return RedirectResponse(url=f"/kite/login?next={route_self}")
@@ -473,6 +490,7 @@ async def sync_kite_holdings(
         sync_type=f"kite_{asset_kind}",
         status="started",
         started_at=dt.datetime.utcnow(),
+        user_id=current_user.id,
     )
     db.add(sync_log)
     await db.flush()
@@ -484,7 +502,7 @@ async def sync_kite_holdings(
     unresolved = 0
 
     try:
-        portfolio = await _get_or_create_default_portfolio(db)
+        portfolio = await _get_or_create_default_portfolio(db, current_user.id)
 
         if asset_kind == "stocks":
             raw_holdings = kite.get_holdings()
@@ -747,9 +765,12 @@ async def sync_kite_holdings(
 
 
 @router.get("/holdings")
-async def kite_holdings(db: AsyncSession = Depends(get_db)):
+async def kite_holdings(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Fetch holdings from Zerodha using the active access token."""
-    kite = await _get_authenticated_kite(db)
+    kite = await _get_authenticated_kite(db, current_user.id)
 
     try:
         holdings = kite.get_holdings()
@@ -764,7 +785,7 @@ async def kite_holdings(db: AsyncSession = Depends(get_db)):
 ################### DEBUG ROUTES BELOW - NOT FOR PRODUCTION ###################
 
 @router.get("/refresh-amfi-master")
-async def refresh_amfi_master():
+async def refresh_amfi_master(current_user: User = Depends(get_current_user)):
     """
     Manually refresh the AMFI master data cache.
     Note: AMFI website is geoblocked outside India.
@@ -797,6 +818,7 @@ async def debug_mf_resolver(
     dividend_type: str = Query(..., description="growth or idcw/payout/dividend"),
     kite_nav: float = Query(..., description="Kite last_price for holding"),
     kite_nav_date: dt.date = Query(..., description="Kite last_price_date (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_user),
 ):
     """DEBUG: Start resolver from step 3 using assumed plan/dividend and Kite NAV/date."""
     code, name, debug_data = await _resolve_mf_scheme_code_with_nav_date(
@@ -821,9 +843,12 @@ async def debug_mf_resolver(
     }
 
 @router.get("/debug/mf-holdings")
-async def debug_mf_holdings(db: AsyncSession = Depends(get_db)):
+async def debug_mf_holdings(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """DEBUG: Fetch raw MF holdings from Kite to inspect all fields."""
-    kite = await _get_authenticated_kite(db)
+    kite = await _get_authenticated_kite(db, current_user.id)
 
     try:
         mf_holdings = kite.get_mf_holdings()
