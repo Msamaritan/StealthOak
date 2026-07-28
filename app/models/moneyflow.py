@@ -26,6 +26,12 @@ class BankTransfer(Base):
         DateTime, server_default=func.now(), nullable=False
     )
 
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="User who owns this bank transfer"
+    )
+
     # Relationship: One BankTransfer → Many BrokerCredits
     broker_credits: Mapped[List["BrokerCredit"]] = relationship(
         "BrokerCredit",
@@ -164,6 +170,12 @@ class ActiveSIP(Base):
     last_executed_on: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="User who owns this SIP"
     )
 
     def __repr__(self) -> str:

@@ -3,7 +3,7 @@ SyncLog model - Track synchronization history
 """
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Integer, DateTime, Text
+from sqlalchemy import String, Integer, DateTime, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -79,6 +79,12 @@ class SyncLog(Base):
         DateTime,
         nullable=True,
         comment="When the sync event completed"
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="User who initiated this sync"
     )
 
     def __repr__(self):

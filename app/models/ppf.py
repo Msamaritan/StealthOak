@@ -42,6 +42,12 @@ class PPFBalance(Base):
         comment="Last modification time"
     )
 
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="User who owns this PPF account"
+    )
+
     transactions: Mapped[List["PPFTransaction"]] = relationship(
         "PPFTransaction",
         back_populates="ppf_balance",

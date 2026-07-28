@@ -3,7 +3,7 @@ KiteSession model - Store Zerodha authentication tokens
 """
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, DateTime, Text
+from sqlalchemy import String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -76,6 +76,12 @@ class KiteSession(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
         comment="When this session was last updated"
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="User who owns this Kite session"
     )
 
 

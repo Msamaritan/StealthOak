@@ -67,6 +67,12 @@ class InsurancePolicy(Base):
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="User who owns this insurance policy"
+    )
+
     premium_payments: Mapped[List["InsurancePremiumPayment"]] = relationship(
         "InsurancePremiumPayment",
         back_populates="policy",
