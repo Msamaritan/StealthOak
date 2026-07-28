@@ -28,4 +28,5 @@ kiteconnect==5.0.0          # Zerodha Kite Connect API client
 
 # --- Authentication ---
 passlib[bcrypt]==1.7.4     # Password hashing (bcrypt algorithm)
+bcrypt==4.1.2              # Explicit bcrypt version (compatible with passlib 1.7.4)
 itsdangerous==2.2.0        # Session cookie signing (used by Starlette SessionMiddleware)
