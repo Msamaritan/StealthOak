@@ -55,13 +55,24 @@
                         🛡️ Insurance
                     </a>
                 </li>
+                {% if current_user.is_admin %}
+                <li>
+                    <a href="/admin/users" class="nav-item {% if '/admin' in request.url.path %}active{% endif %}">
+                        ⚙️ Admin
+                    </a>
+                </li>
+                {% endif %}
             </ul>
             
             <div class="sidebar-footer">
-                <p class="sidebar-footer-user">User: dataDevil</p>
+                <p class="sidebar-footer-user">{{ current_user.display_name }}</p>
                 <div class="sidebar-toggles">
                     <button id="themeToggleBtn" class="sidebar-toggle-btn" onclick="toggleTheme()" title="Dark Mode">🌙</button>
                     <button id="privacyToggleBtn" class="sidebar-toggle-btn" onclick="togglePrivacy()" title="Switch Privacy On">👁</button>
+                    <!-- Logout: uses a form+POST so it can't be triggered by a prefetched link -->
+                    <form action="/logout" method="post" style="display:inline;margin:0;padding:0;">
+                        <button type="submit" class="sidebar-toggle-btn" title="Sign out">🚪</button>
+                    </form>
                 </div>
             </div>
         </nav>

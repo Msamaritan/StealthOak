@@ -25,3 +25,7 @@ pydantic-settings==2.5.0  # Config management
 python-dateutil==2.9.0    # Date handling helpers
 
 kiteconnect==5.0.0          # Zerodha Kite Connect API client
+
+# --- Authentication ---
+passlib[bcrypt]==1.7.4     # Password hashing (bcrypt algorithm)
+itsdangerous==2.2.0        # Session cookie signing (used by Starlette SessionMiddleware)

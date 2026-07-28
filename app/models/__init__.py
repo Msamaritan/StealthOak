@@ -13,6 +13,7 @@ from app.models.kite_session import KiteSession
 from app.models.moneyflow import BankTransfer, BrokerCredit, MoneyFlowInvestment, ActiveSIP
 from app.models.ppf import PPFBalance, PPFTransaction
 from app.models.insurance import InsurancePolicy, InsurancePremiumPayment
+from app.models.user import User
 
 # This allows: from app.models import Portfolio
 # Instead of:  from app.models.portfolio import Portfolio
@@ -23,4 +24,5 @@ __all__ = [
     "BankTransfer", "BrokerCredit", "MoneyFlowInvestment", "ActiveSIP",
     "PPFBalance", "PPFTransaction",
     "InsurancePolicy", "InsurancePremiumPayment",
+    "User",
     ]

@@ -4,13 +4,16 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from config import settings
 from app.database import init_db, close_db
 from app.routers import router
+from app.routers.auth import NotAuthenticatedException, router as auth_router
 from app.utils import format_date_dd_mm_yyyy, format_indian_rupee
 
 
@@ -99,8 +102,27 @@ def create_app() -> FastAPI:
         description="A privacy-first portfolio tracker for passive investors.",
         lifespan=lifespan,
     )
-    
-    
+
+    # ----- SESSION MIDDLEWARE -----
+    # Starlette's SessionMiddleware stores session data in a signed cookie.
+    # The secret_key signs the cookie payload — anyone who knows it could
+    # forge sessions, so override it in production via the
+    # STEALTHOAK_SECRET_KEY environment variable.
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.secret_key,
+        session_cookie="stealthoak_session",
+        same_site="lax",   # Protects against CSRF for cross-site requests
+        https_only=False,  # Set True in production when serving over HTTPS
+    )
+
+    # ----- EXCEPTION HANDLER -----
+    # When get_current_user raises NotAuthenticatedException,
+    # redirect the browser to /login instead of returning a JSON 500 error.
+    @app.exception_handler(NotAuthenticatedException)
+    async def not_authenticated_handler(request: Request, exc: NotAuthenticatedException):
+        return RedirectResponse(url="/login", status_code=303)
+
     # ----- STATIC FILES -----
     # Serve CSS, JS, images from /static URL
     app.mount(
@@ -108,11 +130,14 @@ def create_app() -> FastAPI:
         StaticFiles(directory="app/static"),
         name="static"
     )
-    
+
     # ----- ROUTERS -----
-    # Include all route handlers
+    # Auth routes (/login, /logout) are public — included separately
+    # so they are never wrapped by the get_current_user dependency.
+    app.include_router(auth_router)
+    # All other application routes
     app.include_router(router)
-    
+
     return app
 
 

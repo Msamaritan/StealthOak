@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     https_proxy: str = ""
     no_proxy: str = ""
     
+    # --- Authentication ---
+    # IMPORTANT: Override this with a long random string in production via
+    # the STEALTHOAK_SECRET_KEY environment variable or .env file.
+    # Example (generate one): python -c "import secrets; print(secrets.token_hex(32))"
+    secret_key: str = "change-me-in-production-use-a-long-random-string"
+
     kite_api_key: str = ""
     kite_api_secret: str = ""
     kite_disable_ssl: bool = False
