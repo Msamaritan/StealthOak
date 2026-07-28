@@ -12,15 +12,15 @@
     <div class="metrics-row insurance-metrics">
         <div class="metric-card">
             <span class="metric-label">Total Policies</span>
-            <span class="metric-value">{{ total_policy_count }}</span>
+            <span class="metric-value pv">{{ total_policy_count }}</span>
         </div>
         <div class="metric-card">
             <span class="metric-label">Active Policies</span>
-            <span class="metric-value">{{ active_policy_count }}</span>
+            <span class="metric-value pv">{{ active_policy_count }}</span>
         </div>
         <div class="metric-card">
             <span class="metric-label">Total Premium Paid</span>
-            <span class="metric-value">₹{{ "{:,.2f}".format(total_premium_paid)|format_indian_rupee }}</span>
+            <span class="metric-value pv">₹{{ "{:,.2f}".format(total_premium_paid)|format_indian_rupee }}</span>
         </div>
     </div>
 
@@ -62,7 +62,7 @@
                             <td><strong>{{ policy.policy_name }}</strong></td>
                             <td>{{ policy.provider }}</td>
                             <td>
-                                ₹{{ "{:,.2f}".format(policy.premium_amount)|format_indian_rupee }}
+                                <span class="pv">₹{{ "{:,.2f}".format(policy.premium_amount)|format_indian_rupee }}</span>
                                 <small>{{ policy.premium_frequency|replace('_', ' ')|title }}</small>
                             </td>
                             <td>{{ policy.start_date|format_date_dd_mm_yyyy }}</td>
@@ -75,9 +75,9 @@
                             </td>
                             <td>
                                 {% if policy.total_premium_for_term is not none %}
-                                ₹{{ "{:,.2f}".format(policy.total_premium_for_term)|format_indian_rupee }}
+                                <span class="pv">₹{{ "{:,.2f}".format(policy.total_premium_for_term)|format_indian_rupee }}</span>
                                 <small>
-                                    Remaining: ₹{{ "{:,.2f}".format(policy.remaining_premium_for_term or 0)|format_indian_rupee }}
+                                    Remaining: <span class="pv">₹{{ "{:,.2f}".format(policy.remaining_premium_for_term or 0)|format_indian_rupee }}</span>
                                 </small>
                                 {% if policy.next_premium_date %}
                                 <small>
@@ -91,7 +91,7 @@
                             </td>
                             <td>
                                 {% if policy.compute_investment_gain and policy.investment_gain_percent is not none %}
-                                <span class="{% if policy.investment_gain_percent >= 0 %}profit{% else %}loss{% endif %}">
+                                <span class="pv {% if policy.investment_gain_percent >= 0 %}profit{% else %}loss{% endif %}">
                                     {{ "{:+.2f}".format(policy.investment_gain_percent) }}%
                                 </span>
                                 {% else %}
@@ -122,10 +122,10 @@
                                         <div><span>Nominee</span><strong>{{ policy.nominee or "—" }}</strong></div>
                                         <div><span>Maturity Date</span><strong>{% if policy.maturity_date %}{{ policy.maturity_date|format_date_dd_mm_yyyy }}{% else %}—{% endif %}</strong></div>
                                         <div><span>Policy Term</span><strong>{% if policy.policy_term_years is not none %}{{ policy.policy_term_years }} years{% else %}—{% endif %}</strong></div>
-                                        <div><span>Sum Assured</span><strong>{% if policy.sum_assured %}₹{{ "{:,.2f}".format(policy.sum_assured)|format_indian_rupee }}{% else %}—{% endif %}</strong></div>
-                                        <div><span>Maturity Benefit Value</span><strong>{% if policy.maturity_benefit_value is not none %}₹{{ "{:,.2f}".format(policy.maturity_benefit_value)|format_indian_rupee }}{% else %}—{% endif %}</strong></div>
+                                        <div><span>Sum Assured</span><strong>{% if policy.sum_assured %}<span class="pv">₹{{ "{:,.2f}".format(policy.sum_assured)|format_indian_rupee }}</span>{% else %}—{% endif %}</strong></div>
+                                        <div><span>Maturity Benefit Value</span><strong>{% if policy.maturity_benefit_value is not none %}<span class="pv">₹{{ "{:,.2f}".format(policy.maturity_benefit_value)|format_indian_rupee }}</span>{% else %}—{% endif %}</strong></div>
                                         <div><span>Last Premium Payment Date</span><strong>{% if policy.last_premium_payment_date %}{{ policy.last_premium_payment_date|format_date_dd_mm_yyyy }}{% else %}—{% endif %}</strong></div>
-                                        <div><span>Total Premium Paid</span><strong>₹{{ "{:,.2f}".format(policy.total_premium_paid) }}</strong></div>
+                                        <div><span>Total Premium Paid</span><strong><span class="pv">₹{{ "{:,.2f}".format(policy.total_premium_paid)|format_indian_rupee }}</span></strong></div>
                                         <div><span>Notes</span><strong>{{ policy.notes or "—" }}</strong></div>
                                     </div>
                                 </div>
@@ -356,6 +356,7 @@
 
     // Format amount to Indian rupee format (x,xx,xx,xxx)
     function formatIndianRupee(amount) {
+        if (window._privacyMode) return '*****';
         if (amount === null || amount === undefined || isNaN(amount)) return '0.00';
         var num = Math.abs(Number(amount)).toFixed(2);
         var parts = num.split('.');
@@ -547,8 +548,9 @@
             return;
         }
 
-        var html = '<p class="insurance-history-total"><strong>Total Paid:</strong> ₹'
+        var html = '<p class="insurance-history-total"><strong>Total Paid:</strong> <span class="pv">₹'
             + formatIndianRupee(data.total_paid)
+            + '</span>'
             + '</p>';
 
         html += '<div class="insurance-table-wrap"><table class="data-table"><thead><tr>'
@@ -558,7 +560,7 @@
         data.payments.forEach(function (payment) {
             html += '<tr>'
                 + '<td>' + formatDateDDMMYYYY(payment.date) + '</td>'
-                + '<td>₹' + formatIndianRupee(payment.amount) + '</td>'
+                + '<td><span class="pv">₹' + formatIndianRupee(payment.amount) + '</span></td>'
                 + '<td>' + (payment.payment_mode || '—') + '</td>'
                 + '<td>' + (payment.reference_no || '—') + '</td>'
                 + '<td>' + (payment.notes || '—') + '</td>'
@@ -567,6 +569,9 @@
 
         html += '</tbody></table></div>';
         historyContent.innerHTML = html;
+        if (typeof window._applyPrivacyToDOM === 'function') {
+            window._applyPrivacyToDOM(window._privacyMode);
+        }
     }
 
     function closeHistoryModal() {

@@ -78,26 +78,26 @@
                     {% endif %}
                 </td>
                 <td>{{ mf.symbol }}</td>
-                <td>{{ "{:.4f}".format(mf.quantity) }}</td>
-                <td>{{ mf.avg_price|format_currency('INR', 4) }}</td>
+                <td><span class="pv">{{ "{:.4f}".format(mf.quantity) }}</span></td>
+                <td><span class="pv">{{ mf.avg_price|format_currency('INR', 4) }}</span></td>
                 <td>
                     {% if mf.current_price %}
-                        {{ mf.current_price|format_currency('INR', 4) }}
+                        <span class="pv">{{ mf.current_price|format_currency('INR', 4) }}</span>
                     {% else %}
                         <span class="unavailable">Unavailable</span>
                     {% endif %}
                 </td>
-                <td>{{ mf.invested_value|format_currency('INR') }}</td>
+                <td><span class="pv">{{ mf.invested_value|format_currency('INR') }}</span></td>
                 <td>
                     {% if mf.current_value %}
-                        {{ mf.current_value|format_currency('INR') }}
+                        <span class="pv">{{ mf.current_value|format_currency('INR') }}</span>
                     {% else %}
                         --
                     {% endif %}
                 </td>
                 <td class="{% if mf.pnl and mf.pnl >= 0 %}profit{% elif mf.pnl %}loss{% endif %}">
                     {% if mf.pnl is not none %}
-                        {{ "{:+,.2f}".format(mf.pnl) }}
+                        <span class="pv">{{ "{:+,.2f}".format(mf.pnl) }}</span>
                         <br>
                         <small>({{ "{:+.2f}".format(mf.pnl_percent) }}%)</small>
                     {% else %}

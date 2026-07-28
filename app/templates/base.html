@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}StealthOak{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260531a">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260602a">
+    <!-- Apply theme before render to avoid flash -->
+    <script>
+        (function () {
+            var t = localStorage.getItem('so-theme');
+            if (t) document.documentElement.setAttribute('data-theme', t);
+            window._privacyMode = localStorage.getItem('so-privacy') === 'on';
+        })();
+    </script>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -50,7 +58,11 @@
             </ul>
             
             <div class="sidebar-footer">
-                <p>User: dataDevil</p>
+                <p class="sidebar-footer-user">User: dataDevil</p>
+                <div class="sidebar-toggles">
+                    <button id="themeToggleBtn" class="sidebar-toggle-btn" onclick="toggleTheme()" title="Dark Mode">🌙</button>
+                    <button id="privacyToggleBtn" class="sidebar-toggle-btn" onclick="togglePrivacy()" title="Switch Privacy On">👁</button>
+                </div>
             </div>
         </nav>
         
@@ -61,8 +73,65 @@
     </div>
     
     <!-- Global formatting utilities for all pages -->
-    <script src="/static/js/formatting.js?v=20260524b"></script>
+    <script src="/static/js/formatting.js?v=20260602a"></script>
     
     {% block extra_scripts %}{% endblock %}
+
+    <!-- Theme & Privacy toggle logic -->
+    <script>
+        (function () {
+            function _updateThemeIcon() {
+                var btn = document.getElementById('themeToggleBtn');
+                if (!btn) return;
+                var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                btn.textContent = isDark ? '☀️' : '🌙';
+                btn.title = isDark ? 'Light Mode' : 'Dark Mode';
+            }
+
+            function _updatePrivacyIcon() {
+                var btn = document.getElementById('privacyToggleBtn');
+                if (!btn) return;
+                btn.textContent = window._privacyMode ? '👁' : '🙈';
+                btn.title = window._privacyMode ? 'Switch Privacy Off' : 'Switch Privacy On';
+            }
+
+            window._applyPrivacyToDOM = function (on) {
+                document.querySelectorAll('.pv').forEach(function (el) {
+                    if (on) {
+                        if (!el.hasAttribute('data-orig')) {
+                            el.setAttribute('data-orig', el.textContent);
+                        }
+                        el.textContent = '*****';
+                    } else {
+                        var orig = el.getAttribute('data-orig');
+                        if (orig !== null) el.textContent = orig;
+                    }
+                });
+            };
+
+            window.toggleTheme = function () {
+                var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                var next = isDark ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                localStorage.setItem('so-theme', next);
+                _updateThemeIcon();
+            };
+
+            window.togglePrivacy = function () {
+                window._privacyMode = !window._privacyMode;
+                localStorage.setItem('so-privacy', window._privacyMode ? 'on' : 'off');
+                window._applyPrivacyToDOM(window._privacyMode);
+                _updatePrivacyIcon();
+            };
+
+            document.addEventListener('DOMContentLoaded', function () {
+                _updateThemeIcon();
+                _updatePrivacyIcon();
+                if (window._privacyMode) {
+                    window._applyPrivacyToDOM(true);
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

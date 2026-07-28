@@ -77,6 +77,7 @@ function convertToDateInputFormat(dateStr) {
  * @returns {string} Formatted amount string in Indian rupee format
  */
 function formatIndianRupee(amount) {
+    if (window._privacyMode) return '*****';
     if (amount === null || amount === undefined || isNaN(amount)) {
         return '0.00';
     }
@@ -115,5 +116,6 @@ function formatIndianRupee(amount) {
  * @returns {string} Formatted amount string with ₹ symbol
  */
 function formatCurrencyINR(amount) {
+    if (window._privacyMode) return '₹*****';
     return '₹' + formatIndianRupee(amount);
 }

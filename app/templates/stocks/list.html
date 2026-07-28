@@ -76,26 +76,26 @@
                     <br>
                     <small class="exchange-badge">{{ stock.exchange or '-' }}</small>
                 </td>
-                <td>{{ stock.quantity }}</td>
-                <td>{{ stock.avg_price|format_currency('INR') }}</td>
+                <td><span class="pv">{{ stock.quantity }}</span></td>
+                <td><span class="pv">{{ stock.avg_price|format_currency('INR') }}</span></td>
                 <td>
                     {% if stock.current_price %}
-                        {{ stock.current_price|format_currency('INR') }}
+                        <span class="pv">{{ stock.current_price|format_currency('INR') }}</span>
                     {% else %}
                         <span class="unavailable">Unavailable</span>
                     {% endif %}
                 </td>
-                <td>{{ stock.invested_value|format_currency('INR') }}</td>
+                <td><span class="pv">{{ stock.invested_value|format_currency('INR') }}</span></td>
                 <td>
                     {% if stock.current_value %}
-                        {{ stock.current_value|format_currency('INR') }}
+                        <span class="pv">{{ stock.current_value|format_currency('INR') }}</span>
                     {% else %}
                         --
                     {% endif %}
                 </td>
                 <td class="{% if stock.pnl and stock.pnl >= 0 %}profit{% elif stock.pnl %}loss{% endif %}">
                     {% if stock.pnl is not none %}
-                        {{ "{:+,.2f}".format(stock.pnl) }}
+                        <span class="pv">{{ "{:+,.2f}".format(stock.pnl) }}</span>
                         <br>
                         <small>({{ "{:+.2f}".format(stock.pnl_percent) }}%)</small>
                     {% else %}

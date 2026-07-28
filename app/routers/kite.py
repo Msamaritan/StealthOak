@@ -459,7 +459,7 @@ async def sync_kite_holdings(
     if asset_kind not in {"stocks", "mutualfunds"}:
         raise HTTPException(status_code=404, detail="Unsupported sync target")
 
-    redirect_target = "/stocks" if asset_kind == "stocks" else "/mutualfunds"
+    redirect_target = "/stocks/india" if asset_kind == "stocks" else "/mutualfunds/india"
     route_self = f"/kite/sync/{asset_kind}"
 
     try:

@@ -1227,3 +1227,249 @@ hr {
         padding: var(--spacing-md);
     }
 }
+
+/* ============================================
+   SIDEBAR TOGGLE BUTTONS (theme / privacy)
+   ============================================ */
+.sidebar-footer {
+    opacity: 1;
+}
+
+.sidebar-footer-user {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    margin-bottom: var(--spacing-sm);
+}
+
+.sidebar-toggles {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.sidebar-toggle-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.85);
+    border-radius: var(--radius-sm);
+    padding: 0.25rem 0.55rem;
+    font-size: 1rem;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.sidebar-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* ============================================
+   DARK MODE — Atom One Dark Inspired
+   ============================================ */
+[data-theme="dark"] {
+    --color-primary: #61afef;
+    --color-primary-dark: #3e8ed0;
+    --color-primary-light: #56b6c2;
+
+    --color-background: #21252b;
+    --color-surface: #282c34;
+    --color-surface-dark: #2c313a;
+
+    --color-text: #abb2bf;
+    --color-text-muted: #7f848e;
+    --color-text-light: #5c6370;
+
+    --color-profit: #98c379;
+    --color-profit-bg: rgba(152, 195, 121, 0.16);
+    --color-loss: #e06c75;
+    --color-loss-bg: rgba(224, 108, 117, 0.16);
+
+    --color-border: #3a404b;
+    --color-danger: #e06c75;
+    --color-warning: #e5c07b;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.55);
+}
+
+/* Sidebar in dark mode */
+[data-theme="dark"] .sidebar {
+    background-color: #1f2329;
+    border-right: 1px solid #343b46;
+}
+
+[data-theme="dark"] .sidebar-header {
+    border-bottom-color: #343b46;
+}
+
+[data-theme="dark"] .nav-links li a {
+    color: rgba(171, 178, 191, 0.84);
+}
+
+[data-theme="dark"] .nav-links li a:hover {
+    background-color: rgba(97, 175, 239, 0.12);
+    color: #9cc7f3;
+}
+
+[data-theme="dark"] .nav-links li a.active {
+    background-color: rgba(97, 175, 239, 0.18);
+    color: #c7def8;
+    border-left-color: #61afef;
+}
+
+[data-theme="dark"] .sidebar-footer {
+    border-top-color: #343b46;
+}
+
+[data-theme="dark"] .sidebar-toggle-btn {
+    border-color: rgba(171, 178, 191, 0.35);
+    color: rgba(171, 178, 191, 0.95);
+}
+
+[data-theme="dark"] .sidebar-toggle-btn:hover {
+    background: rgba(97, 175, 239, 0.16);
+    border-color: #61afef;
+    color: #9cc7f3;
+}
+
+/* Form inputs in dark mode */
+[data-theme="dark"] .form-group input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] .form-group select,
+[data-theme="dark"] .form-group textarea {
+    color: var(--color-text);
+    background-color: var(--color-surface);
+    color-scheme: dark;
+}
+
+[data-theme="dark"] .form-group input:not([type="checkbox"]):not([type="radio"]):focus,
+[data-theme="dark"] .form-group select:focus {
+    box-shadow: 0 0 0 3px rgba(97, 175, 239, 0.18);
+}
+
+/* Buttons in dark mode */
+[data-theme="dark"] .btn-primary {
+    background-color: #4fa1e2;
+    color: #f3f7fb;
+}
+
+[data-theme="dark"] .btn-primary:hover {
+    background-color: #61afef;
+}
+
+[data-theme="dark"] .btn-secondary {
+    background-color: var(--color-surface-dark);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+    background-color: #343b46;
+}
+
+[data-theme="dark"] .btn-danger:hover {
+    background-color: #c65862;
+}
+
+/* Hardcoded color overrides */
+[data-theme="dark"] .insurance-detail-row td {
+    background: #242932;
+}
+
+[data-theme="dark"] .breakdown-ppf { color: #ffbb33; }
+[data-theme="dark"] .breakdown-gold { color: #ffcc55; }
+[data-theme="dark"] .breakdown-silver { color: #99b0c0; }
+
+/* Market cards */
+[data-theme="dark"] .market-card {
+    background: #282c34;
+    border-color: rgba(171, 178, 191, 0.22);
+    color: var(--color-text);
+}
+
+[data-theme="dark"] .market-card:hover {
+    box-shadow: 0 12px 18px rgba(0, 0, 0, 0.45);
+    border-color: rgba(97, 175, 239, 0.45);
+}
+
+[data-theme="dark"] .market-card::after {
+    background: radial-gradient(circle at top right, rgba(97, 175, 239, 0.08), transparent 42%);
+}
+
+[data-theme="dark"] .market-card h3 { color: #d4dae3; }
+[data-theme="dark"] .market-card p  { color: rgba(171, 178, 191, 0.8); }
+
+[data-theme="dark"] .market-card-cta {
+    background: rgba(97, 175, 239, 0.14);
+    color: #9cc7f3;
+}
+
+[data-theme="dark"] .market-card-picture {
+    background: rgba(92, 99, 112, 0.24);
+    border-color: rgba(171, 178, 191, 0.2);
+    color: #d4dae3;
+}
+
+[data-theme="dark"] .market-card--india {
+    background: linear-gradient(180deg, #282c34 0%, #2b313b 100%);
+}
+
+[data-theme="dark"] .market-card--foreign {
+    background: linear-gradient(180deg, #282c34 0%, #2a3039 100%);
+}
+
+[data-theme="dark"] .market-card--india .market-card-picture {
+    background: linear-gradient(135deg, #333a47 0%, #2c3441 100%);
+}
+
+[data-theme="dark"] .market-card--foreign .market-card-picture {
+    background: linear-gradient(135deg, #313747 0%, #2a3140 100%);
+}
+
+[data-theme="dark"] .market-card--india:hover { border-color: rgba(97, 175, 239, 0.45); }
+[data-theme="dark"] .market-card--foreign:hover { border-color: rgba(97, 175, 239, 0.45); }
+
+[data-theme="dark"] .market-placeholder-card {
+    background: #282c34;
+}
+
+/* Moneyflow card overrides (inline styles) */
+[data-theme="dark"] .flow-card.status-partial {
+    border-left-color: #d19a66;
+}
+
+[data-theme="dark"] .flow-card.highlight {
+    background: #2f343d;
+    border-left-color: #61afef;
+    box-shadow: 0 0 0 1px rgba(97, 175, 239, 0.34);
+}
+
+[data-theme="dark"] .status-idle .idle-amount {
+    color: #d19a66;
+}
+
+[data-theme="dark"] .btn-action.btn-danger:hover {
+    background: rgba(224, 108, 117, 0.15);
+}
+
+/* data-table inline small override */
+[data-theme="dark"] .data-table td small,
+[data-theme="dark"] .holdings-table td small {
+    color: var(--color-text-muted) !important;
+}
+
+/* User preference: make every Money Flow text white in dark mode */
+[data-theme="dark"] .moneyflow-container,
+[data-theme="dark"] .moneyflow-container *,
+[data-theme="dark"] .moneyflow-container *::before,
+[data-theme="dark"] .moneyflow-container *::after {
+    color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .moneyflow-container select,
+[data-theme="dark"] .moneyflow-container option,
+[data-theme="dark"] .moneyflow-container input,
+[data-theme="dark"] .moneyflow-container textarea,
+[data-theme="dark"] .moneyflow-container button {
+    color: #f5f7fb !important;
+}
